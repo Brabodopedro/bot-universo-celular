@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status do Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #status {
+            padding: 20px;
+            font-size: 20px;
+            border-radius: 5px;
+            color: white;
+        }
+        .online {
+            background-color: green;
+        }
+        .offline {
+            background-color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Status do Bot</h1>
+    <div id="status" class="offline">Desativado</div>
+    <button onclick="toggleBot()">Ativar/Desativar</button>
+
+    <script>
+        async function toggleBot() {
+            try {
+                const response = await fetch('/status', { method: 'POST' });
+                const result = await response.json();
+                const statusDiv = document.getElementById('status');
+                if (result.active) {
+                    statusDiv.textContent = 'Ativado';
+                    statusDiv.className = 'online';
+                } else {
+                    statusDiv.textContent = 'Desativado';
+                    statusDiv.className = 'offline';
+                }
+            } catch (error) {
+                alert('Erro ao alterar status do bot!');
+            }
+        }
+    </script>
+</body>
+</html>
