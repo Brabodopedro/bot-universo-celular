@@ -213,7 +213,7 @@ class ultraChatBot():
         if choice in ['SIM', '✅', 'SIM']:
             # Em vez de pedir nome/CPF agora, perguntamos a forma de pagamento
             self.send_message(self.chatID, "Escolha a forma de pagamento:\n"
-                                           "1️⃣ - Cartão de Crédito\n"
+                                           "1️⃣ - Cartão de Crédito (Com a taxa da maquina)\n"
                                            "2️⃣ - PIX/Dinheiro (Com desconto)\n"
                                            "3️⃣ - Dar um aparelho usado como parte do pagamento")
             self.states[self.chatID]['state'] = 'ASKED_PAYMENT_METHOD'
@@ -287,7 +287,7 @@ class ultraChatBot():
     def handle_used_phone_defects(self, user_message):
         self.states[self.chatID]['used_phone_defects'] = user_message
         self.send_message(self.chatID, "Obrigado! Agora, como você deseja pagar a diferença?\n"
-                                       "1️⃣ - Cartão de Crédito\n"
+                                       "1️⃣ - Cartão de Crédito (Com a taxa da maquina)\n"
                                        "2️⃣ - PIX/Dinheiro")
         self.states[self.chatID]['state'] = 'ASKED_COMPLEMENT_PAYMENT_METHOD'
         save_states(self.states)
@@ -296,7 +296,7 @@ class ultraChatBot():
         choice = user_message.strip()
         if choice == '1':
             self.states[self.chatID]['payment_complement'] = 'CARTAO'
-            self.send_message(self.chatID, "Você escolheu pagar o restante no Cartão de Crédito. Ok!")
+            self.send_message(self.chatID, "Você escolheu pagar o restante no Cartão de Crédito. Haverá uma taxa adicional da maquininha.")
             # Agora coletar dados pessoais
             self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
             self.send_message(self.chatID, "NOME COMPLETO:")
