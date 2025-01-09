@@ -4,41 +4,120 @@ import pandas as pd
 import os
 import logging
 import time
+import uuid
 from weasyprint import HTML
+import base64
+
+##############################################################################
+# CONFIGURAÇÕES ULTRAMSG
+##############################################################################
 
 STATE_FILE = 'conversation_states.json'
 
-# Ajuste estas variáveis com seus dados UltaMsg
 ULTRAMSG_INSTANCE_ID = "instance99723"  # Substitua pelo seu ID da instância UltraMsg
 ULTRAMSG_TOKEN = "2str21gem9r5za4u"    # Substitua pelo seu token UltraMsg
 
-def format_number(chatID):
-    """Remove o prefixo 'whatsapp:+' do chatID, se existir."""
-    if chatID.startswith("whatsapp:+"):
-        chatID = chatID.replace("whatsapp:+", "")
-    return chatID
+# Dicionário de taxas do Cartão (1 a 18 parcelas)
+CREDIT_RATES = {
+    1: 0.0310,
+    2: 0.0549,
+    3: 0.0680,
+    4: 0.0749,
+    5: 0.0818,
+    6: 0.0885,
+    7: 0.0952,
+    8: 0.1097,
+    9: 0.1163,
+    10: 0.1228,
+    11: 0.1293,
+    12: 0.1356,
+    13: 0.1420,
+    14: 0.1482,
+    15: 0.1544,
+    16: 0.1606,
+    17: 0.1667,
+    18: 0.1727
+}
 
-def send_message_ultramsg(chatID, text):
-    """Envia texto via API da UltraMsg."""
-    chatID = format_number(chatID)
+##############################################################################
+# FUNÇÕES DE APOIO (ENVIO E MANIPULAÇÃO)
+##############################################################################
+
+def format_number(chatID: str) -> str:
+    """
+    Remove o prefixo 'whatsapp:+' se existir, e também pode remover '@c.us'.
+    Exemplo: 'whatsapp:+556781687046@c.us' -> '556781687046'
+    """
+    number = chatID
+    if number.startswith("whatsapp:+"):
+        number = number.replace("whatsapp:+", "")
+    number = number.replace("@c.us", "")
+    return number
+
+def send_message_ultramsg(chatID: str, text: str):
+    """
+    Envia uma mensagem de TEXTO via UltraMsg (endpoint /messages/chat).
+    """
+    to_number = format_number(chatID)
     url = f"https://api.ultramsg.com/{ULTRAMSG_INSTANCE_ID}/messages/chat"
     data = {
-        "to": chatID,
+        "to": to_number,
         "body": text,
         "token": ULTRAMSG_TOKEN
     }
 
     try:
         response = requests.post(url, data=data)
-        logging.info(f"Mensagem enviada para {chatID}: '{text}'")
+        logging.info(f"Mensagem enviada para {to_number}: '{text}'")
         logging.info(f"Resposta UltraMsg: {response.status_code}, {response.text}")
         return response
     except Exception as e:
         logging.error(f"Erro ao enviar mensagem via UltraMsg: {e}")
         return None
 
-def load_states():
-    """Carrega o dicionário de estados do arquivo JSON."""
+def send_document_ultramsg_base64(chatID: str, pdf_path: str):
+    """
+    Lê o PDF local em binário, converte para Base64 e envia via endpoint /messages/document
+    da UltraMsg, sem precisar de URL pública.
+    """
+    to_number = format_number(chatID)
+    url = f"https://api.ultramsg.com/{ULTRAMSG_INSTANCE_ID}/messages/document"
+    
+    # Lê o PDF em binário
+    try:
+        with open(pdf_path, 'rb') as f:
+            pdf_bytes = f.read()
+    except FileNotFoundError:
+        logging.error(f"Arquivo PDF não encontrado: {pdf_path}")
+        return None
+
+    # Converte para Base64 (string)
+    pdf_b64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    # Os campos dependem da documentação atual da UltraMsg
+    # Alguns aceitam "document" + "base64Encoded": "true", 
+    # ou "fileBase64": pdf_b64 etc. Ajuste conforme a doc oficial:
+    data = {
+        "token": ULTRAMSG_TOKEN,
+        "to": to_number,
+        "base64Encoded": "true",          # Indica que o conteúdo virá em Base64
+        "document": pdf_b64,             # O PDF codificado
+        "filename": os.path.basename(pdf_path)  # Nome exibido ao cliente no WhatsApp
+    }
+
+    try:
+        response = requests.post(url, data=data)
+        logging.info(f"Enviando PDF (base64) para {to_number} -> {pdf_path}")
+        logging.info(f"Resposta UltraMsg: {response.status_code}, {response.text}")
+        return response
+    except Exception as e:
+        logging.error(f"Erro ao enviar PDF via UltraMsg (base64): {e}")
+        return None
+
+def load_states() -> dict:
+    """
+    Carrega o dicionário de estados do arquivo JSON (conversation_states.json).
+    """
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r') as f:
             try:
@@ -55,8 +134,10 @@ def load_states():
         logging.info("Arquivo de estados não encontrado. Criando novo.")
         return {}
 
-def save_states(states):
-    """Salva o dicionário de estados no arquivo JSON."""
+def save_states(states: dict):
+    """
+    Salva o dicionário de estados no arquivo JSON (conversation_states.json).
+    """
     try:
         with open(STATE_FILE, 'w') as f:
             json.dump(states, f, indent=4)
@@ -64,17 +145,29 @@ def save_states(states):
     except Exception as e:
         logging.error(f"Erro ao salvar os estados: {e}")
 
+##############################################################################
+# CLASSE PRINCIPAL DO BOT
+##############################################################################
+
 class ultraChatBot():
     def __init__(self, message_data):
         self.message = message_data
+
+        # Normaliza chatID (ex.: '556781687046@c.us' -> 'whatsapp:+556781687046@c.us')
         raw_chat_id = message_data.get('from')
         if raw_chat_id and not raw_chat_id.startswith("whatsapp:+"):
             raw_chat_id = f"whatsapp:+{raw_chat_id}"
         self.chatID = raw_chat_id
+
+        # Carrega estados
         self.states = load_states()
 
-    def send_message(self, chatID, text):
+    def send_message(self, chatID: str, text: str):
         return send_message_ultramsg(chatID, text)
+
+    ################################################################
+    #                    MENSAGENS BÁSICAS
+    ################################################################
 
     def send_greeting(self):
         greeting = "Olá! Bem-vindo à nossa loja de celulares."
@@ -83,7 +176,7 @@ class ultraChatBot():
     def send_options(self):
         options = (
             "Como podemos te ajudar? Por favor, escolha uma das opções abaixo:\n"
-            "1️⃣ - 📱 Comprar um aparelho\n"
+            "1️⃣ - Cartão de Crédito (Com as taxas da maquina)\n"
             "2️⃣ - 🔧 Assistência Técnica\n"
             "3️⃣ - 👨‍💼 Falar com um atendente\n"
             "4️⃣ - ❌ Sair"
@@ -91,15 +184,17 @@ class ultraChatBot():
         self.send_message(self.chatID, options)
 
     def greet_and_ask_options(self):
-        """ Inicia o fluxo de conversa, setando o estado para 'ASKED_OPTION'. """
+        """
+        Inicia o fluxo de conversa, setando o estado para 'ASKED_OPTION'.
+        """
         self.send_greeting()
         self.send_options()
         self.states[self.chatID] = {'state': 'ASKED_OPTION', 'last_interaction': time.time()}
         save_states(self.states)
 
-    # ----------------------------------------------------------------
-    #                      COMPRAR APARELHO
-    # ----------------------------------------------------------------
+    ################################################################
+    #                LÓGICA DE COMPRA DE APARELHO
+    ################################################################
 
     def handle_buy_device(self):
         question = (
@@ -111,21 +206,18 @@ class ultraChatBot():
         self.states[self.chatID]['last_interaction'] = time.time()
         save_states(self.states)
 
-    def handle_model_search(self, model_name):
-        """ Busca o modelo no arquivo Excel 'Produtos_Lacrados.xlsx' e lista as opções. """
+    def handle_model_search(self, model_name: str):
+        """
+        Busca o modelo no arquivo Excel 'Produtos_Lacrados.xlsx' e lista as opções.
+        """
         try:
-            df = pd.read_excel('Produtos_Lacrados.xlsx')
-            df.columns = df.columns.str.strip()  # Remove espaços extras nos nomes das colunas
+            df = pd.read_excel('excel/Produtos_Lacrados.xlsx')
+            df.columns = df.columns.str.strip()
 
-            # Filtra as colunas necessárias
             df = df[['Produto', 'Preço (R$)', 'Cor', 'Detalhe']]
-
-            # Adiciona uma coluna "Estado" com base na coluna "Detalhe"
             df['Estado'] = df['Detalhe'].apply(lambda x: 'Lacrado' if pd.isna(x) else f"Seminovo ({x})")
 
-            # Filtra os produtos que contêm o termo buscado
             resultados = df[df['Produto'].str.contains(model_name, case=False, na=False)]
-
             if not resultados.empty:
                 produtos = resultados.to_dict(orient='records')
                 self.states[self.chatID]['produtos'] = produtos
@@ -157,8 +249,7 @@ class ultraChatBot():
             logging.error(f"Erro ao acessar a planilha: {e}")
             self.send_message(self.chatID, "Desculpe, ocorreu um erro ao buscar os produtos disponíveis.")
 
-    def handle_model_number_choice(self, choice):
-        """ Recebe a opção numérica do aparelho, ou N, M, S. """
+    def handle_model_number_choice(self, choice: str):
         choice = choice.strip().upper()
         if choice == 'N':
             self.handle_buy_device()
@@ -178,8 +269,6 @@ class ultraChatBot():
                 produtos = self.states[self.chatID].get('produtos', [])
                 if 1 <= choice_num <= len(produtos):
                     produto_escolhido = produtos[choice_num - 1]
-
-                    # SALVA o produto escolhido para depois gerar PDF
                     self.states[self.chatID]['produto_escolhido'] = produto_escolhido
 
                     mensagem = (
@@ -203,19 +292,20 @@ class ultraChatBot():
             except ValueError:
                 self.send_message(self.chatID, "Entrada inválida. Por favor, digite o número correspondente ao modelo desejado.")
 
-    # ----------------------------------------------------------------
-    #                       FORMA DE PAGAMENTO
-    # ----------------------------------------------------------------
+    ################################################################
+    #                 PAGAMENTO (CARTÃO / PIX / USADO)
+    ################################################################
 
-    def handle_confirm_purchase(self, choice):
-        """Usuário confirma (ou não) a compra do aparelho."""
+    def handle_confirm_purchase(self, choice: str):
         choice = choice.strip().upper()
         if choice in ['SIM', '✅', 'SIM']:
-            # Em vez de pedir nome/CPF agora, perguntamos a forma de pagamento
-            self.send_message(self.chatID, "Escolha a forma de pagamento:\n"
-                                           "1️⃣ - Cartão de Crédito (Com a taxa da maquina)\n"
-                                           "2️⃣ - PIX/Dinheiro (Com desconto)\n"
-                                           "3️⃣ - Dar um aparelho usado como parte do pagamento")
+            self.send_message(
+                self.chatID,
+                "Escolha a forma de pagamento:\n"
+                "1️⃣ - Cartão de Crédito (Com as taxas da maquina)\n"
+                "2️⃣ - PIX/Dinheiro (Com desconto)\n"
+                "3️⃣ - Dar um aparelho usado como parte do pagamento"
+            )
             self.states[self.chatID]['state'] = 'ASKED_PAYMENT_METHOD'
             self.states[self.chatID]['last_interaction'] = time.time()
             save_states(self.states)
@@ -227,19 +317,33 @@ class ultraChatBot():
         else:
             self.send_message(self.chatID, "Desculpe, não entendi. Responda com 'Sim' ou 'Não'.")
 
-    def handle_payment_method(self, user_message):
-        """Usuário escolhe 1 - Cartão, 2 - PIX, 3 - Usado."""
+    def handle_payment_method(self, user_message: str):
         choice = user_message.strip()
         if choice == '1':
+            # CARTÃO
             self.states[self.chatID]['payment_method'] = 'CARTAO'
-            self.send_message(self.chatID, "Você selecionou Cartão de Crédito. Haverá uma taxa adicional da maquininha.")
-            # Agora coletar dados pessoais
-            self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
-            self.send_message(self.chatID, "NOME COMPLETO:")
-            self.states[self.chatID]['state'] = 'ASKED_NAME'
+
+            product = self.states[self.chatID].get('produto_escolhido', {})
+            preco_base = float(product.get('Preço (R$)', 0))
+
+            mensagem_parcelas = "O valor do celular parcelado com a taxa da maquininha é:\n"
+            for parcelas in range(1, 19):
+                taxa = CREDIT_RATES.get(parcelas, 0)
+                valor_com_taxa = preco_base * (1 + taxa)
+                valor_parcela = valor_com_taxa / parcelas
+                mensagem_parcelas += (
+                    f"{parcelas}x: Valor total: R$ {valor_com_taxa:,.2f}\n"
+                    # f"(cada parcela: R$ {valor_parcela:,.2f})\n"
+                )
+
+            mensagem_parcelas += "\nEm quantas vezes você quer fazer?"
+            self.send_message(self.chatID, mensagem_parcelas)
+
+            self.states[self.chatID]['state'] = 'ASKED_CREDIT_INSTALLMENTS'
             save_states(self.states)
 
         elif choice == '2':
+            # PIX/DINHEIRO
             self.states[self.chatID]['payment_method'] = 'PIX_DINHEIRO'
             self.send_message(self.chatID, "Você selecionou PIX/Dinheiro. Você terá um desconto especial.")
             self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
@@ -248,6 +352,7 @@ class ultraChatBot():
             save_states(self.states)
 
         elif choice == '3':
+            # DAR APARELHO USADO
             self.states[self.chatID]['payment_method'] = 'USADO'
             self.send_message(self.chatID, "Perfeito! Precisamos de algumas informações do aparelho que você vai entregar.")
             self.send_message(self.chatID, "Qual o modelo do aparelho usado?")
@@ -256,48 +361,66 @@ class ultraChatBot():
         else:
             self.send_message(self.chatID, "Opção inválida. Selecione 1, 2 ou 3 por favor.")
 
-    # --------------------
-    #   APARELHO USADO
-    # --------------------
+    def handle_credit_installments(self, user_message: str):
+        """
+        Pergunta: Em quantas vezes o cliente quer pagar?
+        """
+        try:
+            parcelas = int(user_message.strip())
+            if 1 <= parcelas <= 18:
+                self.states[self.chatID]['installments'] = parcelas
+                self.send_message(self.chatID, f"Você escolheu pagar em {parcelas}x.")
+                self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
+                self.send_message(self.chatID, "NOME COMPLETO:")
 
-    def handle_used_phone_model(self, user_message):
+                self.states[self.chatID]['state'] = 'ASKED_NAME'
+                save_states(self.states)
+            else:
+                self.send_message(self.chatID, "Por favor, digite um número de 1 a 18.")
+        except ValueError:
+            self.send_message(self.chatID, "Por favor, responda com um número de 1 a 18.")
+
+    ################################################################
+    #                 APARELHO USADO (coleta infos)
+    ################################################################
+
+    def handle_used_phone_model(self, user_message: str):
         self.states[self.chatID]['used_phone_model'] = user_message
         self.send_message(self.chatID, "Qual o armazenamento do aparelho (ex: 64GB, 128GB)?")
         self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_STORAGE'
         save_states(self.states)
 
-    def handle_used_phone_storage(self, user_message):
+    def handle_used_phone_storage(self, user_message: str):
         self.states[self.chatID]['used_phone_storage'] = user_message
         self.send_message(self.chatID, "Como está a bateria do aparelho? (ex: Boa, Ruim, Saúde X%)")
         self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_BATTERY'
         save_states(self.states)
 
-    def handle_used_phone_battery(self, user_message):
+    def handle_used_phone_battery(self, user_message: str):
         self.states[self.chatID]['used_phone_battery'] = user_message
         self.send_message(self.chatID, "O Face ID está funcionando? (Sim / Não)")
         self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_FACEID'
         save_states(self.states)
 
-    def handle_used_phone_faceid(self, user_message):
+    def handle_used_phone_faceid(self, user_message: str):
         self.states[self.chatID]['used_phone_faceid'] = user_message
         self.send_message(self.chatID, "Há algum defeito, tela trincada ou algo parecido? Se sim, descreva. Se não, digite 'Não'.")
         self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_DEFECTS'
         save_states(self.states)
 
-    def handle_used_phone_defects(self, user_message):
+    def handle_used_phone_defects(self, user_message: str):
         self.states[self.chatID]['used_phone_defects'] = user_message
         self.send_message(self.chatID, "Obrigado! Agora, como você deseja pagar a diferença?\n"
-                                       "1️⃣ - Cartão de Crédito (Com a taxa da maquina)\n"
+                                       "1️⃣ - Cartão de Crédito\n"
                                        "2️⃣ - PIX/Dinheiro")
         self.states[self.chatID]['state'] = 'ASKED_COMPLEMENT_PAYMENT_METHOD'
         save_states(self.states)
 
-    def handle_complement_payment_method(self, user_message):
+    def handle_complement_payment_method(self, user_message: str):
         choice = user_message.strip()
         if choice == '1':
             self.states[self.chatID]['payment_complement'] = 'CARTAO'
-            self.send_message(self.chatID, "Você escolheu pagar o restante no Cartão de Crédito. Haverá uma taxa adicional da maquininha.")
-            # Agora coletar dados pessoais
+            self.send_message(self.chatID, "Você escolheu pagar o restante no Cartão de Crédito.")
             self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
             self.send_message(self.chatID, "NOME COMPLETO:")
             self.states[self.chatID]['state'] = 'ASKED_NAME'
@@ -306,21 +429,18 @@ class ultraChatBot():
         elif choice == '2':
             self.states[self.chatID]['payment_complement'] = 'PIX_DINHEIRO'
             self.send_message(self.chatID, "Você escolheu PIX/Dinheiro para o restante. Ok!")
-            # Agora coletar dados pessoais
             self.send_message(self.chatID, "Por favor, informe seus dados para finalizar:")
             self.send_message(self.chatID, "NOME COMPLETO:")
             self.states[self.chatID]['state'] = 'ASKED_NAME'
             save_states(self.states)
-
         else:
             self.send_message(self.chatID, "Opção inválida. Selecione 1 ou 2, por favor.")
 
-    # ----------------------------------------------------------------
-    #              COLETA DE DADOS PESSOAIS E GERA RECIBO
-    # ----------------------------------------------------------------
+    ################################################################
+    #       COLETA DE DADOS PESSOAIS E GERA RECEITA/PDF
+    ################################################################
 
-    def collect_client_data(self, user_message):
-        """ Lida com as perguntas: nome, CPF, telefone, endereço etc., até gerar o recibo. """
+    def collect_client_data(self, user_message: str):
         current_state = self.states[self.chatID].get('state')
 
         if current_state == 'ASKED_NAME':
@@ -357,55 +477,53 @@ class ultraChatBot():
             self.states[self.chatID]['email'] = user_message
             self.send_message(self.chatID, "Obrigado! Estamos gerando o recibo da sua compra...")
 
-            # 1) Calcula o valor final (taxas, desconto, etc.)
+            # 1) Calcula valor final
             self.calculate_final_price()
-
             # 2) Gera PDF
             self.generate_receipt()
-
-            # 3) Marca o estado como FINALIZADO
+            # 3) Finaliza
             self.states[self.chatID]['state'] = 'FINISHED'
 
         save_states(self.states)
 
     def calculate_final_price(self):
-        """Calcula o valor final com base na forma de pagamento e apar. usado."""
         client_data = self.states[self.chatID]
         product = client_data.get('produto_escolhido', {})
         preco_base = float(product.get('Preço (R$)', 0))
 
-        payment_method = client_data.get('payment_method')  # 'CARTAO', 'PIX_DINHEIRO', 'USADO'
-        payment_complement = client_data.get('payment_complement')  # se 'USADO'
-        
-        # EXEMPLOS (ajuste conforme planilhas reais)
-        taxa_cartao = 0.05      # 5% de taxa
-        desconto_pix = 0.10     # 10% de desconto
-        used_phone_value = 0.0  # valor de troca do aparelho usado (exemplo)
+        payment_method = client_data.get('payment_method', '')
+        payment_complement = client_data.get('payment_complement', '')
+        installments = client_data.get('installments', 1)
+
+        desconto_pix = 0.10
+        used_phone_value = 0.0
 
         if payment_method == 'CARTAO':
-            preco_final = preco_base * (1 + taxa_cartao)
+            taxa = CREDIT_RATES.get(installments, 0)
+            preco_final = preco_base * (1 + taxa)
 
         elif payment_method == 'PIX_DINHEIRO':
             preco_final = preco_base * (1 - desconto_pix)
 
         elif payment_method == 'USADO':
-            # Exemplo fixo de valor de troca
+            # Valor fixo do usado (exemplo)
             used_phone_value = 400.0
             preco_base -= used_phone_value
             if preco_base < 0:
                 preco_base = 0
 
-            # Verifica se ele ainda precisa pagar complemento em CARTAO ou PIX
             if payment_complement == 'CARTAO':
-                preco_final = preco_base * (1 + taxa_cartao)
+                # Se quiser, pergunte de novo quantas parcelas etc.
+                taxa = CREDIT_RATES.get(installments, 0)
+                preco_final = preco_base * (1 + taxa)
             elif payment_complement == 'PIX_DINHEIRO':
                 preco_final = preco_base * (1 - desconto_pix)
             else:
-                preco_final = preco_base  # fallback
+                preco_final = preco_base
         else:
-            preco_final = preco_base  # fallback
+            # fallback
+            preco_final = preco_base
 
-        # Armazena para gerar o PDF
         self.states[self.chatID]['valor_troca_usado'] = used_phone_value
         self.states[self.chatID]['valor_final'] = round(preco_final, 2)
         save_states(self.states)
@@ -417,6 +535,17 @@ class ultraChatBot():
         payment_method = client_data.get('payment_method', '')
         payment_complement = client_data.get('payment_complement', '')
         valor_troca_usado = client_data.get('valor_troca_usado', 0)
+        installments = client_data.get('installments', 1)
+
+        nome_cliente = client_data.get('name', 'Cliente')
+        # Extrair número de Whats do chatID
+        number_str = format_number(self.chatID)  # ex.: '556781687046'
+
+        # Monta o nome do PDF: "NomeDoCliente_whatsnumero.pdf"
+        pdf_filename = f"{nome_cliente}_{number_str}.pdf"
+
+        # Salva dentro da pasta PDF
+        pdf_path = os.path.join("PDF", pdf_filename)
 
         html_content = f"""
         <!DOCTYPE html>
@@ -453,7 +582,7 @@ class ultraChatBot():
             <h1>Recibo de Compra</h1>
             <div class="details">
                 <div><strong>Data:</strong> <span>{time.strftime("%d/%m/%Y")}</span></div>
-                <div><strong>Cliente:</strong> <span>{client_data.get('name')}</span></div>
+                <div><strong>Cliente:</strong> <span>{nome_cliente}</span></div>
                 <div><strong>Endereço:</strong> <span>{client_data.get('address')}, {client_data.get('neighborhood')}, {client_data.get('zip')}</span></div>
                 <div><strong>CPF:</strong> <span>{client_data.get('cpf')}</span></div>
                 <div><strong>E-mail:</strong> <span>{client_data.get('email')}</span></div>
@@ -483,8 +612,11 @@ class ultraChatBot():
 
             <div style="margin-top: 20px;">
                 <p><strong>Forma de Pagamento:</strong> {payment_method}</p>
-                {"<p><strong>Forma de Pagamento Complementar:</strong> " + payment_complement + "</p>" if payment_method == "USADO" else ""}
+                {"<p><strong>Pagamento Complementar:</strong> " + payment_complement + "</p>" if payment_method == "USADO" else ""}
                 {f"<p><strong>Valor de troca do aparelho usado:</strong> R$ {valor_troca_usado}</p>" if valor_troca_usado else ""}
+                
+                {"<p><strong>Parcelas:</strong> " + str(installments) + "x</p>" if payment_method == "CARTAO" or (payment_method == "USADO" and payment_complement == "CARTAO") else ""}
+                
                 <p><strong>Valor Final (após taxas/descontos):</strong> R$ {valor_final}</p>
             </div>
 
@@ -496,15 +628,16 @@ class ultraChatBot():
         </html>
         """
 
-        pdf_file = f"{self.chatID}_receipt.pdf"
-        HTML(string=html_content).write_pdf(pdf_file)
+        # Gera o PDF na pasta PDF
+        HTML(string=html_content).write_pdf(pdf_path)
 
+        # Envia o PDF como DOCUMENTO (não mais file://)
         self.send_message(self.chatID, "Aqui está o seu recibo!")
-        send_message_ultramsg(self.chatID, f"file://{os.path.abspath(pdf_file)}")
+        send_document_ultramsg_base64(self.chatID, pdf_path)
 
-    # ----------------------------------------------------------------
-    #              ASSISTÊNCIA TÉCNICA
-    # ----------------------------------------------------------------
+    ################################################################
+    #               LÓGICA DE ASSISTÊNCIA TÉCNICA
+    ################################################################
 
     def handle_technical_assistance_options(self):
         options = (
@@ -518,8 +651,8 @@ class ultraChatBot():
         self.states[self.chatID]['state'] = 'ASKED_TECH_OPTION'
         self.states[self.chatID]['last_interaction'] = time.time()
         save_states(self.states)
-    
-    def handle_tech_option_choice(self, choice):
+
+    def handle_tech_option_choice(self, choice: str):
         choice = choice.strip()
         if choice in ['1', '2', '3']:
             service_map = {'1': 'Tela', '2': 'Bateria', '3': 'Tampa'}
@@ -536,7 +669,7 @@ class ultraChatBot():
         else:
             self.send_message(self.chatID, "Opção inválida. Selecione uma opção válida.")
 
-    def handle_phone_model(self, model_name):
+    def handle_phone_model(self, model_name: str):
         service_type = self.states[self.chatID].get('service_type')
         if not service_type:
             self.send_message(self.chatID, "Desculpe, ocorreu um erro. Vamos começar novamente.")
@@ -544,7 +677,7 @@ class ultraChatBot():
             return
 
         try:
-            df = pd.read_excel('reparo_iphones.xlsx')
+            df = pd.read_excel('excel/reparo_iphones.xlsx')
             df = df[['Modelo', 'Tela', 'Bateria', 'Tampa']]
             df = df.dropna(subset=['Modelo'])
 
@@ -577,7 +710,7 @@ class ultraChatBot():
             logging.error(f"Erro ao acessar a planilha: {e}")
             self.send_message(self.chatID, "Desculpe, ocorreu um erro ao acessar nossas informações.")
 
-    def handle_service_confirmation(self, confirmation):
+    def handle_service_confirmation(self, confirmation: str):
         confirmation = confirmation.strip().upper()
         if confirmation in ['SIM', '✅']:
             self.send_message(self.chatID, "Obrigado! Seu serviço foi agendado. Nossa equipe entrará em contato para mais detalhes.")
@@ -592,15 +725,15 @@ class ultraChatBot():
         else:
             self.send_message(self.chatID, "Desculpe, não entendi. Por favor, responda com 'Sim' ou 'Não'.")
 
-    def handle_problem_description(self, description):
+    def handle_problem_description(self, description: str):
         self.send_message(self.chatID, "Obrigado por nos informar. Nossa equipe técnica irá analisar e entraremos em contato com o orçamento em breve.")
         self.states[self.chatID]['state'] = 'FINISHED'
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
 
-    # ----------------------------------------------------------------
-    #                      FALAR COM ATENDENTE
-    # ----------------------------------------------------------------
+    ################################################################
+    #                 FALAR COM ATENDENTE
+    ################################################################
 
     def handle_talk_to_agent(self):
         message = "Um de nossos atendentes entrará em contato com você em breve."
@@ -609,9 +742,9 @@ class ultraChatBot():
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
 
-    # ----------------------------------------------------------------
-    #              PROCESSAMENTO PRINCIPAL DE ENTRADA
-    # ----------------------------------------------------------------
+    ################################################################
+    #               PROCESSAMENTO PRINCIPAL
+    ################################################################
 
     def Processing_incoming_messages(self):
         user_message = self.message.get('body', '').strip()
@@ -619,15 +752,14 @@ class ultraChatBot():
             self.send_message(self.chatID, "Desculpe, não entendi sua mensagem.")
             return
 
-        # Se não houver histórico de estado, inicia o fluxo
         if self.chatID not in self.states:
             self.greet_and_ask_options()
             return
 
         state_info = self.states[self.chatID]
-        state = state_info.get('state')
+        state = state_info.get('state', '')
 
-        # 1) Menu Principal
+        # MENU PRINCIPAL
         if state == 'ASKED_OPTION':
             if user_message == '1':
                 self.handle_buy_device()
@@ -643,23 +775,21 @@ class ultraChatBot():
             else:
                 self.send_message(self.chatID, "Opção inválida. Por favor, selecione uma das opções enviadas.")
 
-        # 2) Busca modelo para compra
+        # COMPRA
         elif state == 'ASKED_MODEL_NAME':
             self.handle_model_search(user_message)
-
-        # 3) Escolhendo o número do modelo
         elif state == 'ASKED_MODEL_NUMBER':
             self.handle_model_number_choice(user_message)
-
-        # 4) Confirmando a compra
         elif state == 'CONFIRM_PURCHASE':
             self.handle_confirm_purchase(user_message)
 
-        # 5) Forma de pagamento principal
+        # PAGAMENTO
         elif state == 'ASKED_PAYMENT_METHOD':
             self.handle_payment_method(user_message)
+        elif state == 'ASKED_CREDIT_INSTALLMENTS':
+            self.handle_credit_installments(user_message)
 
-        # 6) Aparelho usado
+        # APARELHO USADO
         elif state == 'ASKED_USED_PHONE_MODEL':
             self.handle_used_phone_model(user_message)
         elif state == 'ASKED_USED_PHONE_STORAGE':
@@ -670,17 +800,15 @@ class ultraChatBot():
             self.handle_used_phone_faceid(user_message)
         elif state == 'ASKED_USED_PHONE_DEFECTS':
             self.handle_used_phone_defects(user_message)
-
-        # 7) Forma de pagamento do complemento (depois do usado)
         elif state == 'ASKED_COMPLEMENT_PAYMENT_METHOD':
             self.handle_complement_payment_method(user_message)
 
-        # 8) Coleta de dados pessoais para finalizar (nome, CPF, ...)
+        # COLETA DE DADOS
         elif state.startswith('ASKED_'):
-            # Lida com 'ASKED_NAME', 'ASKED_CPF', 'ASKED_PHONE', etc.
+            # Inclui 'ASKED_NAME', 'ASKED_CPF', etc.
             self.collect_client_data(user_message)
 
-        # 9) Assistência Técnica
+        # ASSISTÊNCIA TÉCNICA
         elif state == 'ASKED_TECH_OPTION':
             self.handle_tech_option_choice(user_message)
         elif state == 'ASKED_PHONE_MODEL':
@@ -690,11 +818,11 @@ class ultraChatBot():
         elif state == 'ASKED_PROBLEM_DESCRIPTION':
             self.handle_problem_description(user_message)
 
-        # 10) Esperando atendente
+        # FALAR COM ATENDENTE
         elif state == 'WAITING_FOR_AGENT':
             self.send_message(self.chatID, "Por favor, aguarde. Um atendente entrará em contato em breve.")
 
-        # 11) Finalizado
+        # FINALIZADO
         elif state == 'FINISHED':
             self.send_message(self.chatID, "Olá novamente! Como podemos te ajudar?")
             self.send_options()
@@ -702,7 +830,7 @@ class ultraChatBot():
             self.states[self.chatID]['last_interaction'] = time.time()
             save_states(self.states)
 
-        # 12) Fallback (estado desconhecido)
+        # Fallback
         else:
             self.send_message(self.chatID, "Desculpe, ocorreu um erro. Vamos começar novamente.")
             self.greet_and_ask_options()

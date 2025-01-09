@@ -1,0 +1,21 @@
+# bot-universo-celular
+repositorio para subir os arquivos do Bot da universo do celular
+
+COMO USAR:
+
+1- atrivar o .venv : source .venv/bin/activate ( linux)
+
+2- pip install -r requirements.txt
+
+3- flask run ou  pip install -r requirements.txt
+
+e em outro sevidor :
+
+3.1 -- ngrok http 5000 
+
+4- pegar o link gerado e colocar no ultramsg
+
+5- link/index.html e ativar o bot 
+
+pronto,, so vender.
+

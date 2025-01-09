@@ -1,51 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Status do Bot</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        #status {
-            padding: 20px;
-            font-size: 20px;
-            border-radius: 5px;
-            color: white;
-        }
-        .online {
-            background-color: green;
-        }
-        .offline {
-            background-color: red;
-        }
-    </style>
+  <meta charset="UTF-8"/>
+  <title>Status do Bot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    #status {
+      padding: 20px;
+      font-size: 20px;
+      border-radius: 5px;
+      color: white;
+    }
+    .online {
+      background-color: green;
+    }
+    .offline {
+      background-color: red;
+    }
+    .upload-section {
+      margin-top: 40px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Status do Bot</h1>
-    <div id="status" class="offline">Desativado</div>
-    <button onclick="toggleBot()">Ativar/Desativar</button>
+  <h1>Status do Bot</h1>
+  <div id="status" class="offline">Desativado</div>
+  <button onclick="toggleBot()">Ativar/Desativar</button>
 
-    <script>
-        async function toggleBot() {
-            try {
-                const response = await fetch('/status', { method: 'POST' });
-                const result = await response.json();
-                const statusDiv = document.getElementById('status');
-                if (result.active) {
-                    statusDiv.textContent = 'Ativado';
-                    statusDiv.className = 'online';
-                } else {
-                    statusDiv.textContent = 'Desativado';
-                    statusDiv.className = 'offline';
-                }
-            } catch (error) {
-                alert('Erro ao alterar status do bot!');
-            }
+  <div class="upload-section">
+    <h2>Atualizar Planilha</h2>
+    <form id="uploadForm">
+      <input type="file" id="excelFile" name="arquivo" accept=".xlsx,.xls" />
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <script>
+    async function toggleBot() {
+      try {
+        const response = await fetch('/status', { method: 'POST' });
+        const result = await response.json();
+        const statusDiv = document.getElementById('status');
+        if (result.active) {
+          statusDiv.textContent = 'Ativado';
+          statusDiv.className = 'online';
+        } else {
+          statusDiv.textContent = 'Desativado';
+          statusDiv.className = 'offline';
         }
-    </script>
+      } catch (error) {
+        alert('Erro ao alterar status do bot!');
+      }
+    }
+
+    // Envio de arquivo via JavaScript fetch
+    const uploadForm = document.getElementById('uploadForm');
+    uploadForm.addEventListener('submit', async (evt) => {
+      evt.preventDefault();
+      const fileInput = document.getElementById('excelFile');
+      if (!fileInput.files.length) {
+        alert('Selecione um arquivo Excel!');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('arquivo', fileInput.files[0]);
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        alert(result.message);
+      } catch (error) {
+        alert('Erro ao enviar arquivo!');
+      }
+    });
+  </script>
 </body>
 </html>

@@ -1,20 +1,10 @@
 # bot-universo-celular
-repositorio para subir os arquivos do Bot da universo do celular
 
-COMO USAR:
+Bot criado pelo Pedro Henrique Brito Obara
 
-1- atrivar o .venv : source .venv/bin/activate ( linux)
+sudo systemctl stop bot      # Para parar o bot
+sudo systemctl start bot     # Para iniciar
+sudo systemctl restart bot   # Para reiniciar
+sudo systemctl status bot    # Para ver o status
 
-2- pip install -r requirements.txt
-
-3- flask run ou  pip install -r requirements.txt
-
-e em outro sevidor :
-
-3.1 -- ngrok http 5000 
-
-4- pegar o link gerado e colocar no ultramsg
-
-5- link/index.html e ativar o bot 
-
-pronto,, so vender.
+Você pode acessar a URL http://SEU_IP:5000/index.html (ou http://SEU_IP:5000/) para o webhook e a página de controle, desde que a porta 5000 esteja liberada no firewall.

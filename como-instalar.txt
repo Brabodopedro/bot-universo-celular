@@ -1,0 +1,50 @@
+1- python3 --version
+
+2- sudo apt-get update
+    sudo apt-get install python3 python3-pip python3-venv
+
+3- subir os arquivos
+
+4 - python3 -m venv venv
+    source venv/bin/activate
+
+5- pip install --upgrade pip
+   pip install -r requirements.txt
+
+6- sudo ufw allow 5000
+
+7- sudo nano /etc/systemd/system/bot.service
+
+8- [Unit]
+    Description=Flask Bot (Universo Celular)
+    After=network.target
+
+    [Service]
+    # Usuário que vai rodar o serviço
+    User=root
+    Group=root
+
+    # Pasta principal do projeto
+    WorkingDirectory=/root/bot-universo
+
+    # Variável PATH para achar o Python do virtualenv
+    Environment="PATH=/root/bot-universo/venv/bin"
+
+    # Comando que inicia o Flask
+    ExecStart=/root/bot-universo/venv/bin/python /root/bot-universo/app.py
+
+    # Se o processo cair, reinicia
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+
+9- sudo systemctl daemon-reload
+
+10- sudo systemctl enable bot
+
+11- sudo systemctl start bot
+
+12- sudo systemctl status bot
+
+PRONTO O BOT TA PRONTO PARA RODAR :).
