@@ -48,3 +48,6 @@
 12- sudo systemctl status bot
 
 PRONTO O BOT TA PRONTO PARA RODAR :).
+
+
+http://89.117.33.97:5000/
