@@ -80,6 +80,38 @@ def upload_excel():
     logging.info(f"Planilha atualizada: {save_path}")
     return jsonify({'message': 'Planilha atualizada com sucesso!'}), 200
 
+# Rota que retorna a lista de conversas atuais
+@app.route('/conversations', methods=['GET'])
+def get_conversations():
+    states = load_states()
+    conversation_list = []
+
+    for chat_id, st in states.items():
+        conversation_list.append({
+            'chatID': chat_id,
+            'agentMode': st.get('agent_mode', False)  # se não existir, default False
+        })
+    return jsonify(conversation_list), 200
+
+# Rota para alterar se a conversa está ou não em modo atendente
+@app.route('/toggle_conversation', methods=['POST'])
+def toggle_conversation():
+    data = request.json
+    chat_id = data.get('chatID')
+    agent_mode = data.get('agentMode')  # true ou false
+
+    if not chat_id:
+        return jsonify({'error': 'chatID não fornecido'}), 400
+
+    states = load_states()
+    if chat_id not in states:
+        return jsonify({'error': 'Conversa não encontrada'}), 404
+
+    # Atualiza o estado
+    states[chat_id]['agent_mode'] = agent_mode
+    save_states(states)
+    return jsonify({'success': True}), 200
+
 ##############################################################################
 # Webhook principal do UltraMsg
 ##############################################################################

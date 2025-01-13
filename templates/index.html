@@ -24,6 +24,28 @@
     .upload-section {
       margin-top: 40px;
     }
+    /* Novo estilo para tabela */
+    .conversation-section {
+      margin-top: 40px;
+      display: inline-block;
+      text-align: left;
+      width: 80%;
+      max-width: 600px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
   </style>
 </head>
 <body>
@@ -37,6 +59,24 @@
       <input type="file" id="excelFile" name="arquivo" accept=".xlsx,.xls" />
       <button type="submit">Enviar</button>
     </form>
+  </div>
+
+  <!-- =========================== -->
+  <!-- Painel de conversas ativas -->
+  <!-- =========================== -->
+  <div class="conversation-section">
+    <h2>Conversas Ativas</h2>
+    <table id="conversationTable">
+      <thead>
+        <tr>
+          <th>Número/ChatID</th>
+          <th>Modo Atendente Humano</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Preenchido dinamicamente via JS -->
+      </tbody>
+    </table>
   </div>
 
   <script>
@@ -57,7 +97,7 @@
       }
     }
 
-    // Envio de arquivo via JavaScript fetch
+    // Envio de arquivo Excel via JavaScript fetch
     const uploadForm = document.getElementById('uploadForm');
     uploadForm.addEventListener('submit', async (evt) => {
       evt.preventDefault();
@@ -79,6 +119,68 @@
       } catch (error) {
         alert('Erro ao enviar arquivo!');
       }
+    });
+
+    // ================================
+    // Carrega as conversas (chatIDs)
+    // ================================
+    async function loadConversations() {
+      try {
+        const response = await fetch('/conversations');
+        const data = await response.json();
+
+        const tableBody = document.querySelector('#conversationTable tbody');
+        tableBody.innerHTML = ''; // Limpa antes de popular
+
+        data.forEach((conversation) => {
+          const row = document.createElement('tr');
+
+          // 1) Célula com o número/ChatID
+          const tdChatID = document.createElement('td');
+          tdChatID.textContent = conversation.chatID;
+          row.appendChild(tdChatID);
+
+          // 2) Célula com o checkbox "agentMode"
+          const tdCheckbox = document.createElement('td');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = conversation.agentMode === true;
+          checkbox.addEventListener('change', async () => {
+            // Quando mudar, fazer POST para /toggle_conversation
+            const newVal = checkbox.checked;
+            const payload = {
+              chatID: conversation.chatID,
+              agentMode: newVal
+            };
+            try {
+              const resp = await fetch('/toggle_conversation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const result = await resp.json();
+              if (!result.success) {
+                alert('Erro ao atualizar status da conversa: ' + (result.error || ''));
+              }
+            } catch (err) {
+              alert('Erro ao comunicar com o servidor');
+              console.error(err);
+            }
+          });
+          tdCheckbox.appendChild(checkbox);
+          row.appendChild(tdCheckbox);
+
+          tableBody.appendChild(row);
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao carregar conversas');
+      }
+    }
+
+    // Carrega conversas assim que a página abrir
+    document.addEventListener('DOMContentLoaded', () => {
+      loadConversations();
     });
   </script>
 </body>

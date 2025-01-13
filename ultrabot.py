@@ -752,6 +752,11 @@ class ultraChatBot():
             self.send_message(self.chatID, "Desculpe, não entendi sua mensagem.")
             return
 
+        # Verifica se a conversa está em modo atendente
+        if self.states[self.chatID].get('agent_mode', False):
+            logging.info(f"Conversa {self.chatID} em modo atendente humano. Bot não responderá automaticamente.")
+            return
+
         if self.chatID not in self.states:
             self.greet_and_ask_options()
             return
