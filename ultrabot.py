@@ -4,9 +4,8 @@ import pandas as pd
 import os
 import logging
 import time
-import uuid
-from weasyprint import HTML
 import base64
+from weasyprint import HTML
 
 ##############################################################################
 # CONFIGURAÇÕES ULTRAMSG
@@ -17,7 +16,7 @@ STATE_FILE = 'conversation_states.json'
 ULTRAMSG_INSTANCE_ID = "instance99723"  # Substitua pelo seu ID da instância UltraMsg
 ULTRAMSG_TOKEN = "2str21gem9r5za4u"    # Substitua pelo seu token UltraMsg
 
-# Dicionário de taxas do Cartão (1 a 18 parcelas)
+# Exemplo de dicionário de taxas do Cartão (1 a 18 parcelas)
 CREDIT_RATES = {
     1: 0.0310,
     2: 0.0549,
@@ -44,10 +43,7 @@ CREDIT_RATES = {
 ##############################################################################
 
 def format_number(chatID: str) -> str:
-    """
-    Remove o prefixo 'whatsapp:+' se existir, e também pode remover '@c.us'.
-    Exemplo: 'whatsapp:+556781687046@c.us' -> '556781687046'
-    """
+    """Remove prefixos como 'whatsapp:+' e '@c.us' para ficar só o número."""
     number = chatID
     if number.startswith("whatsapp:+"):
         number = number.replace("whatsapp:+", "")
@@ -55,10 +51,8 @@ def format_number(chatID: str) -> str:
     return number
 
 def send_message_ultramsg(chatID: str, text: str):
-    """
-    Envia uma mensagem de TEXTO via UltraMsg (endpoint /messages/chat).
-    """
-    to_number = format_number(chatID)
+    # Supondo que chatID seja só numero ex.: "5511999999999"
+    to_number = f"{chatID}@c.us"  # ou se preferir "whatsapp:+{chatID}@c.us"
     url = f"https://api.ultramsg.com/{ULTRAMSG_INSTANCE_ID}/messages/chat"
     data = {
         "to": to_number,
@@ -91,18 +85,15 @@ def send_document_ultramsg_base64(chatID: str, pdf_path: str):
         logging.error(f"Arquivo PDF não encontrado: {pdf_path}")
         return None
 
-    # Converte para Base64 (string)
+    # Converte em Base64
     pdf_b64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
-    # Os campos dependem da documentação atual da UltraMsg
-    # Alguns aceitam "document" + "base64Encoded": "true", 
-    # ou "fileBase64": pdf_b64 etc. Ajuste conforme a doc oficial:
     data = {
         "token": ULTRAMSG_TOKEN,
         "to": to_number,
-        "base64Encoded": "true",          # Indica que o conteúdo virá em Base64
-        "document": pdf_b64,             # O PDF codificado
-        "filename": os.path.basename(pdf_path)  # Nome exibido ao cliente no WhatsApp
+        "base64Encoded": "true",  
+        "document": pdf_b64,
+        "filename": os.path.basename(pdf_path)
     }
 
     try:
@@ -115,9 +106,7 @@ def send_document_ultramsg_base64(chatID: str, pdf_path: str):
         return None
 
 def load_states() -> dict:
-    """
-    Carrega o dicionário de estados do arquivo JSON (conversation_states.json).
-    """
+    """Carrega o dicionário de estados do arquivo JSON."""
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r') as f:
             try:
@@ -125,25 +114,24 @@ def load_states() -> dict:
                 if isinstance(data, dict):
                     return data
                 else:
-                    logging.error("O arquivo de estados não contém um dicionário válido. Reiniciando estados.")
+                    logging.error("O arquivo de estados não contém um dicionário válido.")
                     return {}
             except json.JSONDecodeError:
-                logging.error("Erro ao decodificar o arquivo de estados. Recriando o arquivo.")
+                logging.error("Erro ao decodificar o arquivo de estados.")
                 return {}
     else:
         logging.info("Arquivo de estados não encontrado. Criando novo.")
         return {}
 
 def save_states(states: dict):
-    """
-    Salva o dicionário de estados no arquivo JSON (conversation_states.json).
-    """
+    """Salva o dicionário de estados no arquivo JSON."""
     try:
         with open(STATE_FILE, 'w') as f:
             json.dump(states, f, indent=4)
         logging.info("Estados salvos com sucesso.")
     except Exception as e:
         logging.error(f"Erro ao salvar os estados: {e}")
+
 
 ##############################################################################
 # CLASSE PRINCIPAL DO BOT
@@ -152,14 +140,14 @@ def save_states(states: dict):
 class ultraChatBot():
     def __init__(self, message_data):
         self.message = message_data
-
-        # Normaliza chatID (ex.: '556781687046@c.us' -> 'whatsapp:+556781687046@c.us')
-        raw_chat_id = message_data.get('from')
-        if raw_chat_id and not raw_chat_id.startswith("whatsapp:+"):
-            raw_chat_id = f"whatsapp:+{raw_chat_id}"
-        self.chatID = raw_chat_id
-
-        # Carrega estados
+        raw_chat_id = message_data.get('from', '')
+        # Remove "whatsapp:+" se tiver
+        raw_chat_id = raw_chat_id.replace("whatsapp:+", "")
+        # Remove "@c.us" se tiver
+        raw_chat_id = raw_chat_id.replace("@c.us", "")
+        self.chatID = raw_chat_id  # <= FICA SÓ NÚMERO (ex.: 5511999999999)
+        
+        # Carrega states
         self.states = load_states()
 
     def send_message(self, chatID: str, text: str):
@@ -169,27 +157,22 @@ class ultraChatBot():
     #                    MENSAGENS BÁSICAS
     ################################################################
 
-    def send_greeting(self):
+    def greet_and_ask_options(self):
         greeting = "Olá! Bem-vindo à nossa loja de celulares."
         self.send_message(self.chatID, greeting)
-
-    def send_options(self):
         options = (
             "Como podemos te ajudar? Por favor, escolha uma das opções abaixo:\n"
-            "1️⃣ - Cartão de Crédito (Com as taxas da maquina)\n"
+            "1️⃣ - 📱 Comprar um aparelho\n"
             "2️⃣ - 🔧 Assistência Técnica\n"
             "3️⃣ - 👨‍💼 Falar com um atendente\n"
             "4️⃣ - ❌ Sair"
         )
         self.send_message(self.chatID, options)
 
-    def greet_and_ask_options(self):
-        """
-        Inicia o fluxo de conversa, setando o estado para 'ASKED_OPTION'.
-        """
-        self.send_greeting()
-        self.send_options()
-        self.states[self.chatID] = {'state': 'ASKED_OPTION', 'last_interaction': time.time()}
+        self.states[self.chatID] = {
+            'state': 'ASKED_OPTION',
+            'last_interaction': time.time()
+        }
         save_states(self.states)
 
     ################################################################
@@ -202,6 +185,7 @@ class ultraChatBot():
             "Por favor, digite o nome do modelo ou parte dele (exemplo: iPhone 12)."
         )
         self.send_message(self.chatID, question)
+
         self.states[self.chatID]['state'] = 'ASKED_MODEL_NAME'
         self.states[self.chatID]['last_interaction'] = time.time()
         save_states(self.states)
@@ -215,7 +199,9 @@ class ultraChatBot():
             df.columns = df.columns.str.strip()
 
             df = df[['Produto', 'Preço (R$)', 'Cor', 'Detalhe']]
-            df['Estado'] = df['Detalhe'].apply(lambda x: 'Lacrado' if pd.isna(x) else f"Seminovo ({x})")
+            df['Estado'] = df['Detalhe'].apply(
+                lambda x: 'Lacrado' if pd.isna(x) else f"Seminovo ({x})"
+            )
 
             resultados = df[df['Produto'].str.contains(model_name, case=False, na=False)]
             if not resultados.empty:
@@ -254,13 +240,11 @@ class ultraChatBot():
         if choice == 'N':
             self.handle_buy_device()
         elif choice == 'M':
-            self.send_options()
-            self.states[self.chatID]['state'] = 'ASKED_OPTION'
-            self.states[self.chatID]['last_interaction'] = time.time()
-            save_states(self.states)
+            # Volta ao menu principal
+            self.greet_and_ask_options()
         elif choice == 'S':
             self.send_message(self.chatID, "Obrigado pelo contato. Se precisar de algo, estamos à disposição!")
-            self.states[self.chatID]['state'] = 'FINISHED'
+            self.states[self.chatID]['state'] = 'SESSION_ENDED'
             self.states[self.chatID]['pause_start_time'] = time.time()
             save_states(self.states)
         else:
@@ -298,7 +282,7 @@ class ultraChatBot():
 
     def handle_confirm_purchase(self, choice: str):
         choice = choice.strip().upper()
-        if choice in ['SIM', '✅', 'SIM']:
+        if choice in ['SIM', '✅']:
             self.send_message(
                 self.chatID,
                 "Escolha a forma de pagamento:\n"
@@ -311,7 +295,7 @@ class ultraChatBot():
             save_states(self.states)
         elif choice in ['NÃO', 'NAO', '❌']:
             self.send_message(self.chatID, "Tudo bem! Se precisar de algo mais, estamos à disposição.")
-            self.states[self.chatID]['state'] = 'FINISHED'
+            self.states[self.chatID]['state'] = 'SESSION_ENDED'
             self.states[self.chatID]['pause_start_time'] = time.time()
             save_states(self.states)
         else:
@@ -330,10 +314,8 @@ class ultraChatBot():
             for parcelas in range(1, 19):
                 taxa = CREDIT_RATES.get(parcelas, 0)
                 valor_com_taxa = preco_base * (1 + taxa)
-                valor_parcela = valor_com_taxa / parcelas
                 mensagem_parcelas += (
                     f"{parcelas}x: Valor total: R$ {valor_com_taxa:,.2f}\n"
-                    # f"(cada parcela: R$ {valor_parcela:,.2f})\n"
                 )
 
             mensagem_parcelas += "\nEm quantas vezes você quer fazer?"
@@ -410,9 +392,12 @@ class ultraChatBot():
 
     def handle_used_phone_defects(self, user_message: str):
         self.states[self.chatID]['used_phone_defects'] = user_message
-        self.send_message(self.chatID, "Obrigado! Agora, como você deseja pagar a diferença?\n"
-                                       "1️⃣ - Cartão de Crédito\n"
-                                       "2️⃣ - PIX/Dinheiro")
+        self.send_message(
+            self.chatID,
+            "Obrigado! Agora, como você deseja pagar a diferença?\n"
+            "1️⃣ - Cartão de Crédito\n"
+            "2️⃣ - PIX/Dinheiro"
+        )
         self.states[self.chatID]['state'] = 'ASKED_COMPLEMENT_PAYMENT_METHOD'
         save_states(self.states)
 
@@ -482,7 +467,8 @@ class ultraChatBot():
             # 2) Gera PDF
             self.generate_receipt()
             # 3) Finaliza
-            self.states[self.chatID]['state'] = 'FINISHED'
+            self.states[self.chatID]['state'] = 'SESSION_ENDED'
+            self.states[self.chatID]['pause_start_time'] = time.time()
 
         save_states(self.states)
 
@@ -506,7 +492,7 @@ class ultraChatBot():
             preco_final = preco_base * (1 - desconto_pix)
 
         elif payment_method == 'USADO':
-            # Valor fixo do usado (exemplo)
+            # Valor fixo do usado (exemplo, R$400)
             used_phone_value = 400.0
             preco_base -= used_phone_value
             if preco_base < 0:
@@ -543,8 +529,6 @@ class ultraChatBot():
 
         # Monta o nome do PDF: "NomeDoCliente_whatsnumero.pdf"
         pdf_filename = f"{nome_cliente}_{number_str}.pdf"
-
-        # Salva dentro da pasta PDF
         pdf_path = os.path.join("PDF", pdf_filename)
 
         html_content = f"""
@@ -628,10 +612,9 @@ class ultraChatBot():
         </html>
         """
 
-        # Gera o PDF na pasta PDF
         HTML(string=html_content).write_pdf(pdf_path)
 
-        # Envia o PDF como DOCUMENTO (não mais file://)
+        # Envia o PDF como DOCUMENTO
         self.send_message(self.chatID, "Aqui está o seu recibo!")
         send_document_ultramsg_base64(self.chatID, pdf_path)
 
@@ -713,13 +696,16 @@ class ultraChatBot():
     def handle_service_confirmation(self, confirmation: str):
         confirmation = confirmation.strip().upper()
         if confirmation in ['SIM', '✅']:
-            self.send_message(self.chatID, "Obrigado! Seu serviço foi agendado. Nossa equipe entrará em contato para mais detalhes.")
-            self.states[self.chatID]['state'] = 'FINISHED'
+            self.send_message(
+                self.chatID,
+                "Obrigado! Seu serviço foi agendado. Nossa equipe entrará em contato para mais detalhes."
+            )
+            self.states[self.chatID]['state'] = 'SESSION_ENDED'
             self.states[self.chatID]['pause_start_time'] = time.time()
             save_states(self.states)
         elif confirmation in ['NÃO', 'NAO', '❌']:
             self.send_message(self.chatID, "Tudo bem! Se precisar de algo mais, estamos à disposição.")
-            self.states[self.chatID]['state'] = 'FINISHED'
+            self.states[self.chatID]['state'] = 'SESSION_ENDED'
             self.states[self.chatID]['pause_start_time'] = time.time()
             save_states(self.states)
         else:
@@ -727,7 +713,7 @@ class ultraChatBot():
 
     def handle_problem_description(self, description: str):
         self.send_message(self.chatID, "Obrigado por nos informar. Nossa equipe técnica irá analisar e entraremos em contato com o orçamento em breve.")
-        self.states[self.chatID]['state'] = 'FINISHED'
+        self.states[self.chatID]['state'] = 'SESSION_ENDED'
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
 
@@ -736,12 +722,13 @@ class ultraChatBot():
     ################################################################
 
     def handle_talk_to_agent(self):
+        # Transfere para atendimento humano
         message = "Um de nossos atendentes entrará em contato com você em breve."
         self.send_message(self.chatID, message)
         self.states[self.chatID]['state'] = 'WAITING_FOR_AGENT'
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
-
+        
     ################################################################
     #               PROCESSAMENTO PRINCIPAL
     ################################################################
@@ -757,16 +744,22 @@ class ultraChatBot():
             self.greet_and_ask_options()
             return
 
-        # 2) Agora que já temos self.states[self.chatID], checar se está em modo atendente
+        # 2) Verifica se a conversa está em modo atendente
         if self.states[self.chatID].get('agent_mode', False):
             logging.info(f"Conversa {self.chatID} em modo atendente humano. Bot não responderá automaticamente.")
             return
 
-        # Prossegue com a lógica normal...
+        # 3) Obtém o estado atual
         state_info = self.states[self.chatID]
         state = state_info.get('state', '')
-        
-        # MENU PRINCIPAL
+
+        # 4) Se o estado for SESSION_ENDED, reinicia a conversa
+        if state == 'SESSION_ENDED':
+            self.send_message(self.chatID, "Olá novamente! Como posso ajudar?")
+            self.greet_and_ask_options()
+            return
+
+        # 5) Agora segue o fluxo principal de acordo com o estado
         if state == 'ASKED_OPTION':
             if user_message == '1':
                 self.handle_buy_device()
@@ -776,7 +769,7 @@ class ultraChatBot():
                 self.handle_talk_to_agent()
             elif user_message == '4':
                 self.send_message(self.chatID, "Obrigado pelo contato. Se precisar de algo, estamos à disposição!")
-                self.states[self.chatID]['state'] = 'FINISHED'
+                self.states[self.chatID]['state'] = 'SESSION_ENDED'
                 self.states[self.chatID]['pause_start_time'] = time.time()
                 save_states(self.states)
             else:
@@ -810,9 +803,8 @@ class ultraChatBot():
         elif state == 'ASKED_COMPLEMENT_PAYMENT_METHOD':
             self.handle_complement_payment_method(user_message)
 
-        # COLETA DE DADOS
+        # COLETA DE DADOS (NOME, CPF, etc.)
         elif state.startswith('ASKED_'):
-            # Inclui 'ASKED_NAME', 'ASKED_CPF', etc.
             self.collect_client_data(user_message)
 
         # ASSISTÊNCIA TÉCNICA
@@ -827,17 +819,9 @@ class ultraChatBot():
 
         # FALAR COM ATENDENTE
         elif state == 'WAITING_FOR_AGENT':
-            self.send_message(self.chatID, "Por favor, aguarde. Um atendente entrará em contato em breve.")
+            # Não responde nada
+            pass
 
-        # FINALIZADO
-        elif state == 'FINISHED':
-            self.send_message(self.chatID, "Olá novamente! Como podemos te ajudar?")
-            self.send_options()
-            self.states[self.chatID]['state'] = 'ASKED_OPTION'
-            self.states[self.chatID]['last_interaction'] = time.time()
-            save_states(self.states)
-
-        # Fallback
+        # Fallback: se cair em um estado desconhecido
         else:
-            self.send_message(self.chatID, "Desculpe, ocorreu um erro. Vamos começar novamente.")
             self.greet_and_ask_options()

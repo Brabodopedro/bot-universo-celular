@@ -1,3 +1,12 @@
 # Ignorar pastas
 
 venv/
+
+conversation_states.json
+bot_status.json
+
+# Ignora a pasta de cache do Python
+__pycache__/
+
+# Ignora arquivos .pyc
+*.pyc

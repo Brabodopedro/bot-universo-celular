@@ -7,25 +7,64 @@ import pandas as pd
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# Importe do seu ultrabot
-from ultrabot import load_states, save_states, send_message_ultramsg,  ultraChatBot
+# Importe do ultrabot
+from ultrabot import load_states, save_states, send_message_ultramsg, ultraChatBot
 
 app = Flask(__name__)
 
-# Variável global para controle do estado do bot
-bot_active = False
-
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
+
+# Caminho para o arquivo de status do bot
+STATUS_FILE = 'bot_status.json'
+
+# Função para carregar o status do bot
+def load_bot_status():
+    """Carrega o status do bot de um arquivo JSON. Se não existir, retorna False (desativado)."""
+    if os.path.exists(STATUS_FILE):
+        try:
+            with open(STATUS_FILE, 'r') as f:
+                data = json.load(f)
+                return data.get("active", False)
+        except Exception as e:
+            logging.error(f"Erro ao carregar status do bot: {e}")
+    return False  # Default: desativado
+
+# Função para salvar o status do bot
+def save_bot_status(is_active: bool):
+    """Salva o status do bot em um arquivo JSON."""
+    try:
+        with open(STATUS_FILE, 'w') as f:
+            json.dump({"active": is_active}, f)
+    except Exception as e:
+        logging.error(f"Erro ao salvar status do bot: {e}")
+
+# Inicializa o status do bot ao iniciar
+bot_active = load_bot_status()
 
 # Função para verificar conversas inativas
 def check_inactive_conversations():
     try:
         states = load_states()
         current_time = time.time()
+
         for chatID, state_info in list(states.items()):
             last_interaction = state_info.get('last_interaction', current_time)
-            if current_time - last_interaction > 10 * 60 and state_info['state'] != 'SESSION_ENDED':
+            state = state_info.get('state', '')
+            pause_start_time = state_info.get('pause_start_time', None)
+
+            # Se inativo por mais de 20 min, mas menos de 30 min, enviar aviso
+            if 20 * 60 <= current_time - last_interaction < 30 * 60 and state != 'WARNING_SENT':
+                send_message_ultramsg(
+                    chatID,
+                    "Estamos verificando se você ainda está aí! Sua sessão será encerrada em 30 minutos por inatividade. "
+                    "Se precisar continuar, por favor, envie uma mensagem."
+                )
+                states[chatID]['state'] = 'WARNING_SENT'
+                save_states(states)
+
+            # Se inativo por mais de 30 min e não está em SESSION_ENDED
+            elif current_time - last_interaction >= 30 * 60 and state != 'SESSION_ENDED':
                 send_message_ultramsg(
                     chatID,
                     "Sua sessão foi encerrada por inatividade. "
@@ -33,7 +72,14 @@ def check_inactive_conversations():
                 )
                 states[chatID]['state'] = 'SESSION_ENDED'
                 states[chatID]['pause_start_time'] = time.time()
+                save_states(states)
+
+            # Remove estados SESSION_ENDED há mais de 24 horas
+            if state == 'SESSION_ENDED' and pause_start_time and current_time - pause_start_time > 24 * 60 * 60:
+                del states[chatID]
+
         save_states(states)
+
     except Exception as e:
         logging.error(f"Erro ao verificar conversas inativas: {e}")
 
@@ -53,12 +99,16 @@ def index():
     """Renderiza o HTML de controle do bot (ativar/desativar e upload Excel)."""
     return render_template('index.html')
 
-@app.route('/status', methods=['POST'])
-def toggle_status():
-    """Ativa/Desativa o bot_global. Se desativado, webhook retorna 403."""
+@app.route('/status', methods=['GET', 'POST'])
+def bot_status():
+    """Retorna ou altera o estado do bot."""
     global bot_active
-    bot_active = not bot_active
-    return jsonify({'active': bot_active})
+    if request.method == 'POST':
+        bot_active = not bot_active
+        save_bot_status(bot_active)  # Salva o estado no arquivo
+        return jsonify({'active': bot_active})
+    elif request.method == 'GET':
+        return jsonify({'active': bot_active})
 
 @app.route('/upload', methods=['POST'])
 def upload_excel():
@@ -76,7 +126,6 @@ def upload_excel():
     # Salva (sobrescreve) o arquivo
     file.save(save_path)
 
-    # Aqui você pode fazer backup do antigo, se quiser.
     logging.info(f"Planilha atualizada: {save_path}")
     return jsonify({'message': 'Planilha atualizada com sucesso!'}), 200
 
@@ -89,7 +138,8 @@ def get_conversations():
     for chat_id, st in states.items():
         conversation_list.append({
             'chatID': chat_id,
-            'agentMode': st.get('agent_mode', False)  # se não existir, default False
+            'agentMode': st.get('agent_mode', False),  # se não existir, default False
+            'state': st.get('state', '')  # Adiciona o estado
         })
     return jsonify(conversation_list), 200
 
@@ -143,15 +193,24 @@ def webhook():
         user_message = result.get('body')
         sender = result.get('from')
 
+        # ------ NÃO RESPONDER GRUPO ------
+        # Se for grupo (contém '@g.us'), ignorar
+        if sender.endswith('@g.us'):
+            logging.info(f"Mensagem de grupo recebida ({sender}). Ignorando.")
+            return jsonify({'status': 'ignorado', 'reason': 'mensagem de grupo'}), 200
+        # ----------------------------------
+
         if not user_message or not sender:
             logging.error("Faltando 'sender' ou 'body' nos dados recebidos.")
             return jsonify({'error': 'Faltando sender ou body nos dados'}), 400
 
+        # Monta o objeto de mensagem
         message_data = {
             'body': user_message,
             'from': sender
         }
 
+        # Processa a mensagem no bot
         bot = ultraChatBot(message_data)
         response = bot.Processing_incoming_messages()
         return jsonify({'status': 'sucesso', 'response': response}), 200
@@ -161,5 +220,4 @@ def webhook():
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 if __name__ == '__main__':
-    # Rode preferencialmente em 0.0.0.0 e port=5000 (ou 80 se quiser root).
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)

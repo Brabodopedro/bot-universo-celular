@@ -2,84 +2,251 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Status do Bot</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 50px;
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      color: #333;
     }
+
+    header {
+      background-color: #00ccff;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    main {
+      margin: 20px auto;
+      max-width: 800px;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+      h2 {
+      color: #007bff;
+    }
+    h1 {
+      color: black;
+    }
+
     #status {
       padding: 20px;
-      font-size: 20px;
+      font-size: 22px;
       border-radius: 5px;
       color: white;
+      text-align: center;
+      margin-bottom: 20px;
     }
+
     .online {
-      background-color: green;
+      background-color:rgb(54, 216, 92);
     }
+
     .offline {
-      background-color: red;
+      background-color: #dc3545;
     }
-    .upload-section {
-      margin-top: 40px;
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
     }
-    /* Novo estilo para tabela */
-    .conversation-section {
-      margin-top: 40px;
-      display: inline-block;
-      text-align: left;
-      width: 80%;
-      max-width: 600px;
+
+    button:hover {
+      background-color: #0056b3;
     }
+
+    .upload-section, .conversation-section {
+      margin-top: 30px;
+    }
+
+    .upload-section form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .upload-section input {
+      padding: 10px;
+      font-size: 14px;
+    }
+
     table {
       border-collapse: collapse;
       width: 100%;
+      margin-top: 20px;
     }
-    table, th, td {
-      border: 1px solid #ccc;
-    }
+
     th, td {
-      padding: 8px;
+      padding: 10px;
+      border: 1px solid #ccc;
       text-align: left;
     }
+
     th {
       background-color: #f2f2f2;
+      font-weight: bold;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .state-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .state-legend div {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .state-box {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #ccc;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    @media (max-width: 600px) {
+      main {
+        padding: 10px;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 16px;
+      color: #333;
+    }
+    table thead th {
+      background-color: #f2f2f2;
+      text-align: left;
+      padding: 10px;
+      border-bottom: 2px solid #ccc;
+    }
+    table tbody td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    table tbody tr:hover {
+      background-color: #f9f9f9;
     }
   </style>
+  
 </head>
 <body>
-  <h1>Status do Bot</h1>
-  <div id="status" class="offline">Desativado</div>
-  <button onclick="toggleBot()">Ativar/Desativar</button>
+  <header>
+    <h1>Status do Bot</h1>
+  </header>
+  <main>
+    <div id="status" class="offline">Desativado</div>
+    <button onclick="toggleBot()">Ativar/Desativar</button>
 
-  <div class="upload-section">
-    <h2>Atualizar Planilha</h2>
-    <form id="uploadForm">
-      <input type="file" id="excelFile" name="arquivo" accept=".xlsx,.xls" />
-      <button type="submit">Enviar</button>
-    </form>
-  </div>
+    <div class="upload-section">
+      <h2>Atualizar Planilha</h2>
+      <h4>Exemplo: Produtos_Lacrados.xlsx</h4>
+      <form id="uploadForm">
+        <input type="file" id="excelFile" name="arquivo" accept=".xlsx,.xls" />
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
 
-  <!-- =========================== -->
-  <!-- Painel de conversas ativas -->
-  <!-- =========================== -->
-  <div class="conversation-section">
-    <h2>Conversas Ativas</h2>
-    <table id="conversationTable">
-      <thead>
-        <tr>
-          <th>Número/ChatID</th>
-          <th>Modo Atendente Humano</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Preenchido dinamicamente via JS -->
-      </tbody>
-    </table>
-  </div>
+    <div class="conversation-section">
+      <div style="margin-bottom: 20px; text-align: left;">
+        <h3 style="margin-bottom: 10px;">Legenda</h3>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <span style="display: inline-block; background-color: orange; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
+          <span>Esperando pelo atendente </span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <span style="display: inline-block; background-color: yellow; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
+          <span>Aviso de inatividade enviado </span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <span style="display: inline-block; background-color: red; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
+          <span>Sessão encerrada </span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+          <span style="display: inline-block; background-color: green; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
+          <span>Venda feita pelo bot </span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="display: inline-block; background-color: #00ccff; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
+          <span>Outros estados</span>
+        </div>
+      </div>
+      <h2>Conversas Ativas</h2>
+
+      
+      <input 
+        type="text" 
+        INFO:root:Estados salvos com sucesso.
+        placeholder="Buscar número/ChatID..." 
+        oninput="filterConversations()" 
+      />
+      <table id="conversationTable">
+        <thead>
+          <tr>
+            <th>Número/ChatID</th>
+            <th>Modo Atendente Humano</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Preenchido dinamicamente via JS -->
+        </tbody>
+      </table>
+    </div>
+  </main>
 
   <script>
+     // Função para filtrar conversas (definida conforme explicado acima)
+    function filterConversations() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const table = document.getElementById('conversationTable');
+      const rows = table.getElementsByTagName('tr');
+
+      for (let i = 1; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        if (!cells.length) continue;
+
+        const chatIDText = cells[0].textContent.toLowerCase();
+        rows[i].style.display = chatIDText.includes(searchTerm) ? '' : 'none';
+      }
+    }
+
     async function toggleBot() {
       try {
         const response = await fetch('/status', { method: 'POST' });
@@ -96,6 +263,29 @@
         alert('Erro ao alterar status do bot!');
       }
     }
+
+    async function checkBotStatus() {
+      try {
+        const response = await fetch('/status', { method: 'GET' });
+        const result = await response.json();
+        const statusDiv = document.getElementById('status');
+        if (result.active) {
+          statusDiv.textContent = 'Ativado';
+          statusDiv.className = 'online';
+        } else {
+          statusDiv.textContent = 'Desativado';
+          statusDiv.className = 'offline';
+        }
+      } catch (error) {
+        alert('Erro ao verificar status do bot!');
+      }
+    }
+  
+    document.addEventListener('DOMContentLoaded', () => {
+      checkBotStatus();
+      loadConversations();
+      setInterval(loadConversations, 60000); // Atualiza conversas a cada 1 minuto
+    });
 
     // Envio de arquivo Excel via JavaScript fetch
     const uploadForm = document.getElementById('uploadForm');
@@ -128,48 +318,36 @@
       try {
         const response = await fetch('/conversations');
         const data = await response.json();
-
+    
         const tableBody = document.querySelector('#conversationTable tbody');
         tableBody.innerHTML = ''; // Limpa antes de popular
-
+    
         data.forEach((conversation) => {
           const row = document.createElement('tr');
-
-          // 1) Célula com o número/ChatID
+    
+          // Cria a célula para o ChatID
           const tdChatID = document.createElement('td');
           tdChatID.textContent = conversation.chatID;
+    
+          // Aplica a cor com base no estado
+          const state = conversation.state;
+          tdChatID.style.backgroundColor = getColorForState(state);
+    
           row.appendChild(tdChatID);
-
-          // 2) Célula com o checkbox "agentMode"
+    
+          // Cria a célula para o checkbox de "Modo Atendente"
           const tdCheckbox = document.createElement('td');
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = conversation.agentMode === true;
+    
           checkbox.addEventListener('change', async () => {
-            // Quando mudar, fazer POST para /toggle_conversation
-            const newVal = checkbox.checked;
-            const payload = {
-              chatID: conversation.chatID,
-              agentMode: newVal
-            };
-            try {
-              const resp = await fetch('/toggle_conversation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              const result = await resp.json();
-              if (!result.success) {
-                alert('Erro ao atualizar status da conversa: ' + (result.error || ''));
-              }
-            } catch (err) {
-              alert('Erro ao comunicar com o servidor');
-              console.error(err);
-            }
+            await toggleAgentMode(conversation.chatID, checkbox.checked);
           });
+    
           tdCheckbox.appendChild(checkbox);
           row.appendChild(tdCheckbox);
-
+    
           tableBody.appendChild(row);
         });
       } catch (err) {
@@ -177,11 +355,44 @@
         alert('Erro ao carregar conversas');
       }
     }
-
-    // Carrega conversas assim que a página abrir
+    
+    function getColorForState(state) {
+      switch (state) {
+        case 'WAITING_FOR_AGENT':
+          return 'orange';
+        case 'WARNING_SENT':
+          return 'yellow';
+        case 'SESSION_ENDED':
+          return 'red';
+        case 'FINISHED':
+          return 'green';
+        default:
+          return '#00ccff';
+      }
+    }
+    
+    async function toggleAgentMode(chatID, isEnabled) {
+      try {
+        const response = await fetch('/toggle_conversation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatID, agentMode: isEnabled })
+        });
+        const result = await response.json();
+        if (!result.success) {
+          alert('Erro ao atualizar o status da conversa!');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao se comunicar com o servidor');
+      }
+    }
+    
     document.addEventListener('DOMContentLoaded', () => {
       loadConversations();
+      setInterval(loadConversations, 30000); // Atualiza conversas a cada 30 segundos 
     });
   </script>
+
 </body>
 </html>
