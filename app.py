@@ -57,7 +57,7 @@ def check_inactive_conversations():
             if 20 * 60 <= current_time - last_interaction < 30 * 60 and state != 'WARNING_SENT':
                 send_message_ultramsg(
                     chatID,
-                    "Estamos verificando se você ainda está aí! Sua sessão será encerrada em 30 minutos por inatividade. "
+                    "Estamos verificando se você ainda está aí! Sua sessão será pausada em 30 minutos por inatividade. "
                     "Se precisar continuar, por favor, envie uma mensagem."
                 )
                 states[chatID]['state'] = 'WARNING_SENT'
@@ -67,8 +67,8 @@ def check_inactive_conversations():
             elif current_time - last_interaction >= 30 * 60 and state != 'SESSION_ENDED':
                 send_message_ultramsg(
                     chatID,
-                    "Sua sessão foi encerrada por inatividade. "
-                    "Se precisar de algo, por favor, envie uma nova mensagem para iniciar um novo atendimento."
+                    "Sua sessão foi pausada por inatividade. "
+                    "Se precisar de algo, por favor, envie uma nova mensagem para iniciaremos um novo atendimento."
                 )
                 states[chatID]['state'] = 'SESSION_ENDED'
                 states[chatID]['pause_start_time'] = time.time()

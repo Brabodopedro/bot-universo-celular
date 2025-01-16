@@ -1,0 +1,125 @@
+1. Saudação / Menu Inicial
+Contexto: Quando o usuário inicia a conversa ou o bot não encontra um estado salvo para aquele número.
+
+Saudação
+
+"Olá! Bem-vindo à nossa loja de celulares."
+Exibir opções principais
+
+"Como podemos te ajudar? Por favor, escolha uma das opções abaixo:\n" "1️⃣ - 📱 Comprar um aparelho\n" "2️⃣ - 🔧 Assistência Técnica\n" "3️⃣ - 👨‍💼 Falar com um atendente\n" "4️⃣ - ❌ Sair\n" "5️⃣ - 💰 Vender um aparelho"
+2. Mensagens genéricas de fluxo / reexibir menu
+Quando o usuário pede para voltar ao menu principal ou quando o fluxo finaliza e o bot oferece novamente as opções:
+
+"Como podemos te ajudar? Por favor, escolha uma das opções abaixo:\n" "1️⃣ - 📱 Comprar um aparelho\n" "2️⃣ - 🔧 Assistência Técnica\n" "3️⃣ - 👨‍💼 Falar com um atendente\n" "4️⃣ - ❌ Sair\n" "5️⃣ - 💰 Vender um aparelho"
+3. Fluxo de “Comprar um aparelho”
+3.1 Perguntar o modelo desejado
+"Qual modelo de celular você está procurando? Por favor, digite o nome do modelo ou parte dele (exemplo: iPhone 12)."
+3.2 Mostrar lista de aparelhos disponíveis
+"✨📱 LISTA DE APARELHOS DISPONÍVEIS 📱✨\n"
+(A lista é montada dinamicamente, mas começa com este cabeçalho.)
+
+"Por favor, digite o número do modelo que você deseja:\n" "ou\n" "N - Escolher outro modelo\n" "M - Menu Principal\n" "S - Sair"
+
+3.3 Exibir detalhes do produto escolhido
+"Você escolheu o seguinte produto:\n" "Produto: {nomeProduto}\n" "Cor: {cor}\n" "Estado: {estado}\n" "Preço: {preco}\n\n" "Você gostaria de prosseguir com a compra?\n" "Digite 'Sim' para confirmar, ou escolha uma opção:\n" "N - Escolher outro modelo\n" "M - Menu Principal\n" "S - Sair"
+3.4 Mensagens de encerramento se o usuário desistir
+"Obrigado pelo contato. Se precisar de algo, estamos à disposição!"
+"Tudo bem! Se precisar de algo mais, estamos à disposição."
+4. Fluxo de Pagamento (Quando o usuário confirma a compra)
+Escolha da forma de pagamento
+
+"Escolha a forma de pagamento:\n" "1️⃣ - Cartão de Crédito (Com as taxas da maquina)\n" "2️⃣ - PIX/Dinheiro (Com desconto)\n" "3️⃣ - Dar um aparelho usado como parte do pagamento"
+Parcelas no Cartão (caso o usuário escolha “1”)
+
+"O valor do celular parcelado com a taxa da maquininha é:\n" (lista das parcelas, ex.: “1x: R$ XYZ, 2x: R$ XYZ...”)
+"Em quantas vezes você quer fazer?"
+Pix / Dinheiro (caso “2”)
+
+"Você selecionou PIX/Dinheiro. Você terá um desconto especial."
+"Por favor, informe seus dados para finalizar:"
+"NOME COMPLETO:"
+Dar aparelho usado (caso “3”)
+
+"Perfeito! Precisamos de algumas informações do aparelho que você vai entregar."
+"Qual o modelo do aparelho usado?"
+5. Coleta de dados do aparelho usado (como parte do pagamento)
+"Qual o armazenamento do aparelho (ex: 64GB, 128GB)?"
+"Como está a bateria do aparelho? (ex: Boa, Ruim, Saúde X%)"
+"O Face ID está funcionando? (Sim / Não)"
+"Há algum defeito, tela trincada ou algo parecido? Se sim, descreva. Se não, digite 'Não'."
+"Obrigado! Agora, como você deseja pagar a diferença?\n1️⃣ - Cartão de Crédito\n2️⃣ - PIX/Dinheiro"
+6. Coleta de dados pessoais (NOME, CPF, etc.)
+Quando o usuário começa a informar dados para finalizar a compra:
+
+"NOME COMPLETO:"
+"CPF:"
+"CEL:"
+"ENDEREÇO DA ENTREGA:"
+"BAIRRO:"
+"CEP:"
+"E-MAIL:"
+"Obrigado! Estamos gerando o recibo da sua compra..."
+7. Envio do Recibo em PDF
+Depois de gerar o PDF:
+
+"Aqui está o seu recibo!"
+(Em seguida, o bot envia o documento como PDF via send_document_ultramsg_base64.)
+
+8. Fluxo de Assistência Técnica
+Perguntar tipo de serviço
+
+"Por favor, selecione o tipo de serviço de assistência técnica que você precisa:\n" "1️⃣ - Trocar Tela\n" "2️⃣ - Trocar Bateria\n" "3️⃣ - Trocar Tampa Traseira\n" "4️⃣ - Outro Problema"
+Se o usuário escolher 4 (“Outro Problema”)
+
+"Por favor, descreva o problema que está enfrentando."
+Se escolheu 1, 2 ou 3
+
+"Por favor, informe o modelo do seu iPhone (exemplo: iPhone 12)."
+Mostrar valor do reparo
+
+"O valor para trocar a {parte} do seu {modelo} é R$ {price:.2f}."
+Perguntar se deseja prosseguir
+
+"Deseja prosseguir com o serviço?\nResponda com:\nSim ✅\nNão ❌"
+Se o usuário confirma (“Sim”)
+
+"Obrigado! Seu serviço foi agendado. Nossa equipe entrará em contato para mais detalhes."
+Se o usuário nega ou finaliza
+
+"Tudo bem! Se precisar de algo mais, estamos à disposição."
+9. Fluxo de “Vender um aparelho” (Opção 5 no Menu)
+Início
+
+"Ótimo! Para avaliarmos seu aparelho, precisamos de algumas informações."
+"Qual o modelo do seu celular usado? (Exemplo: iPhone 12)"
+Perguntas sequenciais
+
+"Qual o armazenamento do aparelho (ex: 64GB, 128GB)?"
+"Como está a bateria do aparelho? (ex: Boa, Ruim, Saúde 85%)"
+"O Face ID está funcionando? (Sim / Não)"
+"Há algum defeito, tela trincada ou algo parecido? Se sim, descreva. Se não, digite 'Não'."
+Solicitar fotos
+
+"Por favor, envie algumas fotos do aparelho para avaliação. Pode mandar uma de cada vez ou várias. Assim que terminar avise."
+Encerramento
+
+"Obrigado! Recebemos as informações do seu aparelho. Vamos analisar e retornaremos em breve com um valor de proposta."
+10. Falar com Atendente (Atendimento Humano)
+"Um de nossos atendentes entrará em contato com você em breve."
+(Em seguida, o bot define o estado como WAITING_FOR_AGENT, e não manda mais mensagens automáticas.)
+
+11. Mensagens de Erro, Desconhecimento ou Encerramento
+Quando o usuário manda algo vazio
+
+"Desculpe, não entendi sua mensagem."
+Quando o usuário digita algo inválido fora de contexto
+
+"Opção inválida. Por favor, selecione uma das opções enviadas."
+Despedida ou sessão finalizada
+
+"Obrigado pelo contato. Se precisar de algo, estamos à disposição!"
+"Olá novamente! Como podemos te ajudar?" (quando a conversa é reiniciada)
+"Tudo bem! Se precisar de algo mais, estamos à disposição."
+Qualquer outro fallback
+
+"Desculpe, ocorreu um erro. Vamos começar novamente."

@@ -165,7 +165,8 @@ class ultraChatBot():
             "1️⃣ - 📱 Comprar um aparelho\n"
             "2️⃣ - 🔧 Assistência Técnica\n"
             "3️⃣ - 👨‍💼 Falar com um atendente\n"
-            "4️⃣ - ❌ Sair"
+            "4️⃣ - ❌ Sair\n"
+            "5️⃣ - 💰 Vender um aparelho\n"
         )
         self.send_message(self.chatID, options)
 
@@ -174,6 +175,19 @@ class ultraChatBot():
             'last_interaction': time.time()
         }
         save_states(self.states)
+        
+    def send_options(self):
+        """Envia as opções principais para o usuário."""
+        options = (
+            "Como podemos te ajudar? Por favor, escolha uma das opções abaixo:\n"
+            "1️⃣ - 📱 Comprar um aparelho\n"
+            "2️⃣ - 🔧 Assistência Técnica\n"
+            "3️⃣ - 👨‍💼 Falar com um atendente\n"
+            "4️⃣ - ❌ Sair\n"
+            "5️⃣ - 💰 Vender um aparelho\n"
+        )
+        self.send_message(self.chatID, options)
+
 
     ################################################################
     #                LÓGICA DE COMPRA DE APARELHO
@@ -716,6 +730,99 @@ class ultraChatBot():
         self.states[self.chatID]['state'] = 'SESSION_ENDED'
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
+        
+        
+    ################################################################
+    #                 VENDER UM APARELHO
+    ################################################################
+
+        
+    def handle_sell_device(self):
+
+        self.send_message(self.chatID, "Ótimo! Para avaliarmos seu aparelho, precisamos de algumas informações.")
+        self.send_message(self.chatID, "Qual o modelo do seu celular usado? (Exemplo: iPhone 12)")
+        
+        # Define o próximo estado
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_MODEL_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+        
+    def handle_used_phone_model_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_model'] = user_message
+        self.send_message(self.chatID, "Qual o armazenamento do aparelho (ex: 64GB, 128GB)?")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_STORAGE_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_storage_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_storage'] = user_message
+        self.send_message(self.chatID, "Como está a bateria do aparelho? (ex: Boa, Ruim, Saúde 85%)")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_BATTERY_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_battery_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_battery'] = user_message
+        self.send_message(self.chatID, "O Face ID está funcionando? (Sim / Não)")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_FACEID_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_faceid_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_faceid'] = user_message
+        self.send_message(self.chatID, "Há algum defeito, tela trincada ou algo parecido? Se sim, descreva. Se não, digite 'Não'.")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_DEFECTS_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+    def handle_used_phone_model_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_model'] = user_message
+        self.send_message(self.chatID, "Qual o armazenamento do aparelho (ex: 64GB, 128GB)?")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_STORAGE_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_storage_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_storage'] = user_message
+        self.send_message(self.chatID, "Como está a bateria do aparelho? (ex: Boa, Ruim, Saúde 85%)")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_BATTERY_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_battery_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_battery'] = user_message
+        self.send_message(self.chatID, "O Face ID está funcionando? (Sim / Não)")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_FACEID_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+
+    def handle_used_phone_faceid_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_faceid'] = user_message
+        self.send_message(self.chatID, "Há algum defeito, tela trincada ou algo parecido? Se sim, descreva. Se não, digite 'Não'.")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_DEFECTS_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+    
+    def handle_used_phone_defects_sell(self, user_message: str):
+        self.states[self.chatID]['used_phone_defects'] = user_message
+        self.send_message(self.chatID, "Por favor, envie algumas fotos do aparelho para avaliação. "
+                                    "Pode mandar uma de cada vez ou várias. Assim que terminar avise.")
+        self.states[self.chatID]['state'] = 'ASKED_USED_PHONE_PHOTOS_SELL'
+        self.states[self.chatID]['last_interaction'] = time.time()
+        save_states(self.states)
+        
+    def handle_used_phone_photos_sell(self, user_message: str):
+        # Exemplo simples: só guardamos a resposta e finalizamos
+        # Se quiser lidar com várias fotos, você pode criar um array no self.states e armazenar cada imagem recebida.
+        self.states[self.chatID]['used_phone_photos'] = user_message  # ou "Fotos recebidas"
+        
+        # Agradecemos e avisamos que iremos analisar
+        self.send_message(self.chatID, "Obrigado! Recebemos as informações do seu aparelho. "
+                                    "Vamos analisar e retornaremos em breve com um valor de proposta.")
+        
+        # Marcamos a conversa com o status COMPRAR_CEL (conforme solicitado)
+        self.states[self.chatID]['state'] = 'VENDER_CEL'
+        save_states(self.states)
+
 
     ################################################################
     #                 FALAR COM ATENDENTE
@@ -760,7 +867,7 @@ class ultraChatBot():
             return
 
         # 5) Agora segue o fluxo principal de acordo com o estado
-        if state == 'ASKED_OPTION':
+        elif state == 'ASKED_OPTION':
             if user_message == '1':
                 self.handle_buy_device()
             elif user_message == '2':
@@ -769,9 +876,11 @@ class ultraChatBot():
                 self.handle_talk_to_agent()
             elif user_message == '4':
                 self.send_message(self.chatID, "Obrigado pelo contato. Se precisar de algo, estamos à disposição!")
-                self.states[self.chatID]['state'] = 'SESSION_ENDED'
+                self.states[self.chatID]['state'] = 'FINISHED'
                 self.states[self.chatID]['pause_start_time'] = time.time()
                 save_states(self.states)
+            elif user_message == '5':
+                self.handle_sell_device()  # Método que inicia o fluxo de "Vender um aparelho"
             else:
                 self.send_message(self.chatID, "Opção inválida. Por favor, selecione uma das opções enviadas.")
 
@@ -802,6 +911,20 @@ class ultraChatBot():
             self.handle_used_phone_defects(user_message)
         elif state == 'ASKED_COMPLEMENT_PAYMENT_METHOD':
             self.handle_complement_payment_method(user_message)
+            
+        # VENDER APARELHO (NOVOS ESTADOS):
+        elif state == 'ASKED_USED_PHONE_MODEL_SELL':
+            self.handle_used_phone_model_sell(user_message)
+        elif state == 'ASKED_USED_PHONE_STORAGE_SELL':
+            self.handle_used_phone_storage_sell(user_message)
+        elif state == 'ASKED_USED_PHONE_BATTERY_SELL':
+            self.handle_used_phone_battery_sell(user_message)
+        elif state == 'ASKED_USED_PHONE_FACEID_SELL':
+            self.handle_used_phone_faceid_sell(user_message)
+        elif state == 'ASKED_USED_PHONE_DEFECTS_SELL':
+            self.handle_used_phone_defects_sell(user_message)
+        elif state == 'ASKED_USED_PHONE_PHOTOS_SELL':
+            self.handle_used_phone_photos_sell(user_message)
 
         # COLETA DE DADOS (NOME, CPF, etc.)
         elif state.startswith('ASKED_'):
@@ -816,9 +939,22 @@ class ultraChatBot():
             self.handle_service_confirmation(user_message)
         elif state == 'ASKED_PROBLEM_DESCRIPTION':
             self.handle_problem_description(user_message)
+        
+        #FINALIZAR A COMVERSA
+        elif state == 'FINISHED':
+            self.send_message(self.chatID, "Olá novamente! Como podemos te ajudar?")
+            self.send_options()
+            self.states[self.chatID]['state'] = 'ASKED_OPTION'
+            self.states[self.chatID]['last_interaction'] = time.time()
+            save_states(self.states)
 
         # FALAR COM ATENDENTE
         elif state == 'WAITING_FOR_AGENT':
+            # Não responde nada
+            pass
+        
+        # FALAR COM VENDER DEL
+        elif state == 'VENDER_CEL':
             # Não responde nada
             pass
 

@@ -22,7 +22,6 @@
 
     main {
       margin: 20px auto;
-      max-width: 800px;
       padding: 20px;
       background-color: white;
       border-radius: 8px;
@@ -164,6 +163,17 @@
     table tbody tr:hover {
       background-color: #f9f9f9;
     }
+    .tables-container {
+      display: flex;
+      flex-wrap: wrap; /* se quiser que quebre linha em telas pequenas */
+      gap: 20px;       /* espaçamento entre colunas */
+    }
+    
+    .table-column {
+      flex: 1;         /* para distribuir igualmente o espaço */
+      min-width: 240px;
+    }
+    
   </style>
   
 </head>
@@ -172,7 +182,7 @@
     <h1>Status do Bot</h1>
   </header>
   <main>
-    <div id="status" class="offline">Desativado</div>
+    <div style="max-width: 800px"  id="status" class="offline">Desativado</div>
     <button onclick="toggleBot()">Ativar/Desativar</button>
 
     <div class="upload-section">
@@ -185,7 +195,8 @@
     </div>
 
     <div class="conversation-section">
-      <div style="margin-bottom: 20px; text-align: left;">
+      
+      <!-- <div style="margin-bottom: 20px; text-align: left;">
         <h3 style="margin-bottom: 10px;">Legenda</h3>
         <div style="display: flex; align-items: center; margin-bottom: 5px;">
           <span style="display: inline-block; background-color: orange; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
@@ -207,29 +218,100 @@
           <span style="display: inline-block; background-color: #00ccff; width: 20px; height: 20px; border-radius: 4px; margin-right: 10px; border: 1px solid #ccc;"></span>
           <span>Outros estados</span>
         </div>
-      </div>
-      <h2>Conversas Ativas</h2>
+      </div> -->
 
       
-      <input 
-        type="text" 
-        INFO:root:Estados salvos com sucesso.
-        placeholder="Buscar número/ChatID..." 
-        oninput="filterConversations()" 
-      />
-      <table id="conversationTable">
-        <thead>
-          <tr>
-            <th>Número/ChatID</th>
-            <th>Modo Atendente Humano</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Preenchido dinamicamente via JS -->
-        </tbody>
-      </table>
-    </div>
-  </main>
+      <h2>Conversas Ativas</h2>
+
+      <div class="tables-container">
+        
+        <!-- Tabela: WAITING_FOR_AGENT -->
+        <div class="table-column">
+          <h3 style="background-color: orange;">Esperando Atendente</h3>
+          <table id="conversationTable-WAITING_FOR_AGENT">
+            <thead>
+                <tr>
+                  <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Tabela: VENDER_CEL (NOVO STATUS) -->
+        <div class="table-column">
+          <h3 style="background-color: #c400c4;" >Venda de Aparelho</h3>
+          <table id="conversationTable-VENDER_CEL">
+            <thead>
+              <tr>
+                <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      
+        <!-- Tabela: WARNING_SENT -->
+        <div class="table-column">
+          <h3 style="background-color: yellow;">Aviso de Inatividade</h3>
+          <table id="conversationTable-WARNING_SENT">
+            <thead>
+              <tr>
+                <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      
+        <!-- Tabela: SESSION_ENDED -->
+        <div class="table-column">
+          <h3 style="background-color: red;">Sessão Encerrada</h3>
+          <table id="conversationTable-SESSION_ENDED">
+            <thead>
+              <tr>
+                <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      
+        <!-- Tabela: FINISHED -->
+        <div class="table-column">
+          <h3 style="background-color: green;">Finalizada</h3>
+          <table id="conversationTable-FINISHED">
+            <thead>
+              <tr>
+                <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      
+
+      
+        <!-- Se quiser, crie uma tabela para "outros" estados genéricos -->
+        <div class="table-column">
+          <h3 style="background-color: #0084ff;">Outros</h3>
+          <table id="conversationTable-OTHER">
+            <thead>
+              <tr>
+                <th>Número/ChatID</th>
+                <th>Atendente?</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      
 
   <script>
      // Função para filtrar conversas (definida conforme explicado acima)
@@ -314,61 +396,93 @@
     // ================================
     // Carrega as conversas (chatIDs)
     // ================================
+    // Lista de estados que vamos tratar como tabelas separadas
+    const knownStates = [
+    'WAITING_FOR_AGENT',
+    'WARNING_SENT',
+    'SESSION_ENDED',
+    'FINISHED',
+    'VENDER_CEL'
+    ];
+
     async function loadConversations() {
       try {
         const response = await fetch('/conversations');
         const data = await response.json();
-    
-        const tableBody = document.querySelector('#conversationTable tbody');
-        tableBody.innerHTML = ''; // Limpa antes de popular
-    
+
+        // 1) Limpa cada tabela
+        knownStates.forEach((st) => {
+          const tableBody = document.querySelector(`#conversationTable-${st} tbody`);
+          if (tableBody) {
+            tableBody.innerHTML = '';
+          }
+        });
+        // Tabela "OTHER"
+        const tableBodyOther = document.querySelector('#conversationTable-OTHER tbody');
+        if (tableBodyOther) {
+          tableBodyOther.innerHTML = '';
+        }
+
+        // 2) Preenche as tabelas
         data.forEach((conversation) => {
-          const row = document.createElement('tr');
-    
-          // Cria a célula para o ChatID
-          const tdChatID = document.createElement('td');
-          tdChatID.textContent = conversation.chatID;
-    
-          // Aplica a cor com base no estado
+          const row = createRowForConversation(conversation);
+
+          // Verifica se existe uma tabela específica para o state
           const state = conversation.state;
-          tdChatID.style.backgroundColor = getColorForState(state);
-    
-          row.appendChild(tdChatID);
-    
-          // Cria a célula para o checkbox de "Modo Atendente"
-          const tdCheckbox = document.createElement('td');
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.checked = conversation.agentMode === true;
-    
-          checkbox.addEventListener('change', async () => {
-            await toggleAgentMode(conversation.chatID, checkbox.checked);
-          });
-    
-          tdCheckbox.appendChild(checkbox);
-          row.appendChild(tdCheckbox);
-    
-          tableBody.appendChild(row);
+          const tableId = knownStates.includes(state) ? `conversationTable-${state}` : 'conversationTable-OTHER';
+
+          const tableBody = document.querySelector(`#${tableId} tbody`);
+          if (tableBody) {
+            tableBody.appendChild(row);
+          }
         });
       } catch (err) {
         console.error(err);
-        alert('Erro ao carregar conversas');
       }
+      }
+
+    function createRowForConversation(conversation) {
+    const row = document.createElement('tr');
+
+    // Célula do ChatID
+    const tdChatID = document.createElement('td');
+    tdChatID.textContent = conversation.chatID;
+
+    // Cor de fundo (opcional, se ainda quiser colorir por state)
+    tdChatID.style.backgroundColor = getColorForState(conversation.state);
+    row.appendChild(tdChatID);
+
+    // Célula do "Modo Atendente" (checkbox)
+    const tdCheckbox = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = conversation.agentMode === true;
+
+    checkbox.addEventListener('change', async () => {
+      await toggleAgentMode(conversation.chatID, checkbox.checked);
+    });
+
+    tdCheckbox.appendChild(checkbox);
+    row.appendChild(tdCheckbox);
+
+    return row;
     }
-    
+
     function getColorForState(state) {
-      switch (state) {
-        case 'WAITING_FOR_AGENT':
-          return 'orange';
-        case 'WARNING_SENT':
-          return 'yellow';
-        case 'SESSION_ENDED':
-          return 'red';
-        case 'FINISHED':
-          return 'green';
-        default:
-          return '#00ccff';
-      }
+    switch (state) {
+      case 'WAITING_FOR_AGENT':
+        return 'orange';
+      case 'WARNING_SENT':
+        return 'yellow';
+      case 'SESSION_ENDED':
+        return 'red';
+      case 'FINISHED':
+        return 'green';
+      case 'VENDER_CEL':
+        return '#c400c4';
+      default:
+        return '#0084ff';
+    }
     }
     
     async function toggleAgentMode(chatID, isEnabled) {
@@ -390,7 +504,7 @@
     
     document.addEventListener('DOMContentLoaded', () => {
       loadConversations();
-      setInterval(loadConversations, 30000); // Atualiza conversas a cada 30 segundos 
+      setInterval(loadConversations, 10000); // Atualiza conversas a cada 30 segundos 
     });
   </script>
 
