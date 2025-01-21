@@ -223,6 +223,8 @@
       
       <h2>Conversas Ativas</h2>
 
+      <input type="text" id="searchInput" placeholder="Digite para buscar..." onkeyup="filterTables()" />
+
       <div class="tables-container">
         
         <!-- Tabela: WAITING_FOR_AGENT -->
@@ -506,6 +508,41 @@
       loadConversations();
       setInterval(loadConversations, 10000); // Atualiza conversas a cada 30 segundos 
     });
+  </script>
+
+  <script>
+    // Função para filtrar todas as tabelas
+    function filterTables() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const tableContainers = document.querySelectorAll('.table-column'); // Todas as tabelas
+  
+      tableContainers.forEach(container => {
+        const rows = container.querySelectorAll('tbody tr');
+        let hasVisibleRow = false;
+  
+        rows.forEach(row => {
+          const cells = row.getElementsByTagName('td');
+          let rowMatches = false;
+  
+          for (let i = 0; i < cells.length; i++) {
+            if (cells[i].textContent.toLowerCase().includes(searchTerm)) {
+              rowMatches = true;
+              break;
+            }
+          }
+  
+          if (rowMatches) {
+            row.style.display = ''; // Mostra a linha
+            hasVisibleRow = true;
+          } else {
+            row.style.display = 'none'; // Esconde a linha
+          }
+        });
+  
+        // Esconde a tabela se nenhuma linha visível for encontrada
+        container.style.display = hasVisibleRow ? '' : 'none';
+      });
+    }
   </script>
 
 </body>
