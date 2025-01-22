@@ -515,6 +515,8 @@
       const searchTerm = document.getElementById('searchInput').value.toLowerCase();
       const tableContainers = document.querySelectorAll('.table-column'); // Todas as tabelas
   
+      let hasAnyMatch = false; // Verifica se qualquer linha foi encontrada
+  
       tableContainers.forEach(container => {
         const rows = container.querySelectorAll('tbody tr');
         let hasVisibleRow = false;
@@ -523,6 +525,7 @@
           const cells = row.getElementsByTagName('td');
           let rowMatches = false;
   
+          // Verifica se a linha contém o termo de busca
           for (let i = 0; i < cells.length; i++) {
             if (cells[i].textContent.toLowerCase().includes(searchTerm)) {
               rowMatches = true;
@@ -538,9 +541,24 @@
           }
         });
   
-        // Esconde a tabela se nenhuma linha visível for encontrada
+        // Exibe ou oculta a tabela inteira com base nas linhas visíveis
         container.style.display = hasVisibleRow ? '' : 'none';
+  
+        if (hasVisibleRow) {
+          hasAnyMatch = true; // Marca que pelo menos uma correspondência foi encontrada
+        }
       });
+  
+      // Se nenhum termo for encontrado ou o campo estiver vazio, restaura tudo
+      if (!searchTerm || !hasAnyMatch) {
+        tableContainers.forEach(container => {
+          container.style.display = ''; // Mostra todas as tabelas
+          const rows = container.querySelectorAll('tbody tr');
+          rows.forEach(row => {
+            row.style.display = ''; // Mostra todas as linhas
+          });
+        });
+      }
     }
   </script>
 
