@@ -5,6 +5,7 @@ import os
 import logging
 import time
 import base64
+import re
 from weasyprint import HTML
 
 ##############################################################################
@@ -219,6 +220,7 @@ class ultraChatBot():
 
             resultados = df[df['Produto'].str.contains(model_name, case=False, na=False)]
             if not resultados.empty:
+                # Caso encontre resultados, segue o fluxo normal
                 produtos = resultados.to_dict(orient='records')
                 self.states[self.chatID]['produtos'] = produtos
 
@@ -244,10 +246,26 @@ class ultraChatBot():
                 self.states[self.chatID]['last_interaction'] = time.time()
                 save_states(self.states)
             else:
+                # Não encontrou resultados => oferecer 3 opções:
                 self.send_message(self.chatID, "Desculpe, não encontramos esse produto em nosso estoque.")
+                self.send_message(
+                    self.chatID,
+                    "O que você gostaria de fazer agora?\n"
+                    "1️⃣ - Listar aparelhos semelhantes disponíveis\n"
+                    "2️⃣ - Fazer uma nova consulta\n"
+                    "3️⃣ - Voltar ao menu principal\n"
+                )
+                # Guarda o último modelo pesquisado para utilizar na listagem de similares
+                self.states[self.chatID]['last_searched_model'] = model_name
+                self.states[self.chatID]['state'] = 'ASKED_NO_RESULTS_ACTION'
+                self.states[self.chatID]['last_interaction'] = time.time()
+                save_states(self.states)
+
         except Exception as e:
             logging.error(f"Erro ao acessar a planilha: {e}")
             self.send_message(self.chatID, "Desculpe, ocorreu um erro ao buscar os produtos disponíveis.")
+
+
 
     def handle_model_number_choice(self, choice: str):
         choice = choice.strip().upper()
@@ -731,6 +749,104 @@ class ultraChatBot():
         self.states[self.chatID]['pause_start_time'] = time.time()
         save_states(self.states)
         
+    ################################################################
+    #                 VENDER UM APARELHO
+    ################################################################
+    def handle_list_similar_devices(self):
+        # Recupera o último modelo que o usuário procurou
+        last_model = self.states[self.chatID].get('last_searched_model', '')
+        if not last_model:
+            # Se não houver modelo anterior, avisa e retorna ao fluxo
+            self.send_message(self.chatID, "Não há modelo anterior para comparar. Vamos iniciar novamente a busca.")
+            self.handle_buy_device()
+            return
+
+        # Tenta capturar algo do tipo "iPhone 14"
+        match = re.search(r'iPhone\s*(\d+)', last_model, re.IGNORECASE)
+        if match:
+            try:
+                # Converte a parte numérica para int
+                number = int(match.group(1))
+
+                # Define iPhone (n-1) e iPhone (n+1), se fizer sentido
+                model_minus = f"iPhone {number - 1}" if number > 1 else None
+                model_plus = f"iPhone {number + 1}"
+
+                # Leitura do Excel
+                df = pd.read_excel('excel/Produtos_Lacrados.xlsx')
+                df.columns = df.columns.str.strip()
+                df = df[['Produto', 'Preço (R$)', 'Cor', 'Detalhe']]
+                df['Estado'] = df['Detalhe'].apply(
+                    lambda x: 'Lacrado' if pd.isna(x) else f"Seminovo ({x})"
+                )
+
+                # Aqui vamos juntar resultados dos dois modelos
+                similares = pd.DataFrame()
+                
+                if model_minus:  # se "iPhone 0" não faz sentido, ignoramos
+                    results_minus = df[df['Produto'].str.contains(model_minus, case=False, na=False)]
+                    similares = pd.concat([similares, results_minus], ignore_index=True)
+                
+                # iPhone (n+1)
+                results_plus = df[df['Produto'].str.contains(model_plus, case=False, na=False)]
+                similares = pd.concat([similares, results_plus], ignore_index=True)
+
+                if not similares.empty:
+                    produtos = similares.to_dict(orient='records')
+
+                    mensagem = "✨📱 LISTA DE APARELHOS SEMELHANTES DISPONÍVEIS 📱✨\n"
+                    for i, row in enumerate(produtos, start=1):
+                        mensagem += (
+                            f"{i}. Produto: {row['Produto']}\n"
+                            f"   Cor: {row['Cor']}\n"
+                            f"   Estado: {row['Estado']}\n"
+                            f"   Preço: {row['Preço (R$)']}\n\n"
+                        )
+
+                    self.send_message(self.chatID, mensagem)
+                    self.send_message(
+                        self.chatID,
+                        "Se algum desses modelos te interessar, por favor digite o número correspondente.\n"
+                        "Ou:\n"
+                        "N - Fazer outra pesquisa\n"
+                        "M - Menu Principal\n"
+                        "S - Sair"
+                    )
+                    # Reaproveitando o estado de 'ASKED_MODEL_NUMBER' para escolher
+                    self.states[self.chatID]['produtos'] = produtos
+                    self.states[self.chatID]['state'] = 'ASKED_MODEL_NUMBER'
+                    self.states[self.chatID]['last_interaction'] = time.time()
+                    save_states(self.states)
+                else:
+                    self.send_message(self.chatID, "Não encontramos modelos semelhantes (iPhone anterior ou posterior).")
+                    self.send_message(
+                        self.chatID,
+                        "Podemos tentar outra pesquisa?\n"
+                        "1 - Digitar outro modelo\n"
+                        "2 - Menu Principal"
+                    )
+                    # Pode criar um novo estado ou reaproveitar a lógica de redirect
+                    self.states[self.chatID]['state'] = 'ASKED_SIMILAR_NOT_FOUND'
+                    self.states[self.chatID]['last_interaction'] = time.time()
+                    save_states(self.states)
+            except Exception as e:
+                logging.error(f"Erro ao listar similares: {e}")
+                self.send_message(self.chatID, "Desculpe, ocorreu um erro ao buscar aparelhos semelhantes.")
+        else:
+            # Se o usuário não digitou algo que bata com 'iPhone (numero)',
+            # podemos apenas dizer que não há semelhantes específicos
+            self.send_message(self.chatID, "Não foi possível identificar um iPhone para sugerir similares.")
+            self.send_message(
+                self.chatID,
+                "Deseja tentar outra pesquisa?\n"
+                "1 - Digitar outro modelo\n"
+                "2 - Menu Principal"
+            )
+            # Pode criar um novo estado, ou chamar handle_buy_device() novamente
+            self.states[self.chatID]['state'] = 'ASKED_SIMILAR_NOT_FOUND'
+            self.states[self.chatID]['last_interaction'] = time.time()
+            save_states(self.states)
+
         
     ################################################################
     #                 VENDER UM APARELHO
@@ -883,6 +999,23 @@ class ultraChatBot():
                 self.handle_sell_device()  # Método que inicia o fluxo de "Vender um aparelho"
             else:
                 self.send_message(self.chatID, "Opção inválida. Por favor, selecione uma das opções enviadas.")
+        
+        # ===========================================
+        #         NOVO ESTADO DE 'SEM RESULTADOS'
+        # ===========================================
+        elif state == 'ASKED_NO_RESULTS_ACTION':
+            if user_message == '1':
+                # 1) Listar aparelhos semelhantes
+                self.handle_list_similar_devices()
+            elif user_message == '2':
+                # 2) Fazer nova consulta
+                self.handle_buy_device()
+            elif user_message == '3':
+                # 3) Voltar ao menu principal
+                self.greet_and_ask_options()
+            else:
+                self.send_message(self.chatID, "Por favor, escolha uma das opções: 1, 2 ou 3.")
+
 
         # COMPRA
         elif state == 'ASKED_MODEL_NAME':
